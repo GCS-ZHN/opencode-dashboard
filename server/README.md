@@ -4,27 +4,28 @@ FastAPI aggregation backend for the [opencode-dashboard](https://github.com/GCS-
 project. Reads opencode's local SQLite storage via the `opencode db` CLI and exposes a JSON + SSE
 API for the dashboard front end.
 
-## Install
+## Install (PyPI)
 
 ```bash
 pip install opencode-dashboard-server
 ```
 
-Requires Python ≥ 3.10 and the `opencode` CLI on the same host (the server shells out to
-`opencode db "<SQL>"` — it never opens the SQLite file directly, which is WAL-mode and actively
-written while opencode runs).
+Requires:
 
-## Usage
+- **Python ≥ 3.10**
+- **`opencode` CLI** on the same host — the server shells out to `opencode db "<SQL>"` and never
+  opens the SQLite file directly (it's WAL-mode and actively written while opencode runs).
 
-On each host that runs opencode:
+## Quick start
+
+Run one aggregator per opencode host:
 
 ```bash
 uvicorn app:app --port 8791
 ```
 
-Run on more hosts with different ports (`8792`, `8793`, …) and point the front end at each.
-
-Environment switches:
+Run on more hosts with different ports (`8792`, `8793`, …) and list each in the front end's
+`dashboard.yaml`. Environment switches:
 
 - `DASHBOARD_CORS_ORIGINS` — comma-separated CORS allow-list (defaults to the loopback dev origins `localhost/127.0.0.1:5173` and `:4173`; tighten or widen for your deployment).
 - `DASHBOARD_POLL_SECONDS` — SSE poll interval in seconds (default `5`).
@@ -41,9 +42,11 @@ Environment switches:
 
 JSON is camelCase, timestamps are epoch-ms. Full contract in the repo's `API.md`.
 
-## Development
+## From source (development)
 
 ```bash
+git clone https://github.com/GCS-ZHN/opencode-dashboard
+cd opencode-dashboard/server
 uv sync          # install deps (fastapi, uvicorn) + dev (pytest, httpx)
 uv run pytest    # run tests
 uvx ruff check . # lint
