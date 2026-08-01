@@ -11,8 +11,8 @@ from aggregate import (
 ZERO_TOKENS = {"input": 0, "output": 0, "reasoning": 0,
                "cacheRead": 0, "cacheWrite": 0, "total": 0}
 
-DIR_DASH = "dir:" + "/Users/test/projects/opencode-dashboard".encode().hex()
-DIR_TMP = "dir:" + "/private/tmp".encode().hex()
+DIR_DASH = "dir:" + b"/Users/test/projects/opencode-dashboard".hex()
+DIR_TMP = "dir:" + b"/private/tmp".hex()
 
 
 def test_overview_rollup(runner):

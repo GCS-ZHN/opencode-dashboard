@@ -1,13 +1,22 @@
 {
   "name": "opencode-dashboard-client",
-  "private": true,
   "version": "0.1.0",
   "type": "module",
+  "description": "Front-end for the opencode token-usage dashboard. Ships the built SPA plus the front-end server (bun server.ts) that proxies to dashboard backends.",
+  "files": [
+    "dist",
+    "server.ts",
+    "src/config.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "mock": "bun mock-server.ts"
+    "mock": "bun mock-server.ts",
+    "prepublishOnly": "npm run build"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

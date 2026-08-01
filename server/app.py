@@ -47,7 +47,7 @@ def create_app(runner=None) -> FastAPI:
             return fn()
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception:
             logger.exception("aggregation failed")
             raise HTTPException(500, detail="aggregation failed")
 

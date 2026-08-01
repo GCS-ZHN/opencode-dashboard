@@ -1,5 +1,9 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "dashboard-server"
+name = "opencode-dashboard-server"
 version = "0.1.0"
 description = "FastAPI aggregator over opencode's SQLite storage"
 requires-python = ">=3.10"
@@ -7,6 +11,12 @@ dependencies = [
     "fastapi>=0.115,<1",
     "uvicorn>=0.30,<1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/GCS-ZHN/opencode-dashboard"
+
+[tool.setuptools]
+py-modules = ["app", "aggregate", "db"]
 
 [dependency-groups]
 dev = [
