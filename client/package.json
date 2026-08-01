@@ -1,6 +1,6 @@
 {
   "name": "opencode-dashboard-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "description": "Front-end for the opencode token-usage dashboard. Ships the built SPA plus a node CLI (opencode-dashboard serve/configure) that serves the SPA and proxies to dashboard backends.",
   "homepage": "https://github.com/GCS-ZHN/opencode-dashboard#readme",
