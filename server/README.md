@@ -1,0 +1,44 @@
+# opencode-dashboard-server
+
+FastAPI aggregation backend for the [opencode-dashboard](https://github.com/GCS-ZHN/opencode-dashboard)
+project. Reads opencode's local SQLite storage via the `opencode db` CLI and exposes a JSON + SSE
+API for the dashboard front end.
+
+## Install
+
+```bash
+pip install opencode-dashboard-server
+```
+
+Requires Python ≥ 3.10 and the `opencode` CLI on the same host (the server shells out to
+`opencode db "<SQL>"` — it never opens the SQLite file directly, which is WAL-mode and actively
+written while opencode runs).
+
+## Usage
+
+On each host that runs opencode:
+
+```bash
+uvicorn app:app --port 8791
+```
+
+Run on more hosts with different ports (`8792`, `8793`, …) and point the front end at each.
+
+## API
+
+- `GET /health` — liveness
+- `GET /overview` — whole-host aggregate (tokens by type + cost, session counts, `updatedAt`)
+- `GET /projects` — per-project rollups
+- `GET /projects/{id}` — one project's sessions (parent/child tree)
+- `GET /sessions/{id}` — per-model breakdown for one session (handles mid-conversation model switches)
+- `GET /stream` — SSE: `updated` events when the DB changes (polled ~5s)
+
+JSON is camelCase, timestamps are epoch-ms. Full contract in the repo's `API.md`.
+
+## Development
+
+```bash
+uv sync          # install deps (fastapi, uvicorn) + dev (pytest, httpx)
+uv run pytest    # run tests
+uvx ruff check . # lint
+```
