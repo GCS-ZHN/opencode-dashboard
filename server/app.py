@@ -22,9 +22,12 @@ logger = logging.getLogger("dashboard")
 
 @lru_cache(maxsize=1)
 def opencode_version() -> str:
-    return subprocess.run(
-        ["opencode", "--version"], capture_output=True, text=True, check=True
-    ).stdout.strip()
+    try:
+        return subprocess.run(
+            ["opencode", "--version"], capture_output=True, text=True, check=True
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"  # e.g. CI without the opencode CLI; don't fail the request
 
 
 def create_app(runner=None) -> FastAPI:
