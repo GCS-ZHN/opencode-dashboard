@@ -176,6 +176,7 @@ Endpoints: `GET /health`, `GET /overview`, `GET /projects`, `GET /projects/{proj
 
 - [ ] **Excel export** — export the per-granularity rollups (overview / project / session / model) to a `.xlsx` report.
 - [ ] **MCP service** — expose the dashboard's statistics as an MCP server/tool so agents can query token usage programmatically.
+- [ ] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
 - [ ] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
 - [ ] **Time-range filtering** — restrict the drill-down to a date window (e.g. today / last 7 days / custom).
 

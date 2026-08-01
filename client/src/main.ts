@@ -426,14 +426,28 @@ const app = document.getElementById("app")!;
 
 async function boot(): Promise<void> {
   let servers: ServerConfig[] = [];
+  let configError: string | null = null;
   try {
     const cfg = await api.config();
     servers = cfg.servers;
     SESSION_PAGE = cfg.ui?.sessionPage ?? SESSION_PAGE;
-  } catch {
-    servers = []; // no front-end server / /api/config → render an error
+  } catch (e) {
+    configError = e instanceof Error ? e.message : String(e);
   }
   SERVERS = servers;
+
+  if (configError !== null || servers.length === 0) {
+    const err = el("div", "error");
+    err.append(
+      el("h3", "", "No front-end server configuration"),
+      el("p", "", configError ?? "No servers returned by /api/config — check dashboard.yaml."),
+    );
+    const retry = el("button", "", "Retry");
+    retry.addEventListener("click", () => void boot());
+    err.appendChild(retry);
+    app.replaceChildren(err);
+    return;
+  }
 
   if (servers.length > 1) app.classList.add("multi");
   panels = [];

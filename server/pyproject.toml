@@ -15,6 +15,8 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://github.com/GCS-ZHN/opencode-dashboard"
+Repository = "https://github.com/GCS-ZHN/opencode-dashboard"
+Issues = "https://github.com/GCS-ZHN/opencode-dashboard/issues"
 
 [tool.setuptools]
 py-modules = ["app", "aggregate", "db"]

@@ -6,13 +6,15 @@ import { loadDashboardConfig } from "./config";
 // the resolved server list + ui options from dashboard.yaml.
 const cfg = loadDashboardConfig();
 
+// Regex keys avoid prefix-shadowing: /api/s/1 must not swallow /api/s/10
+// (vite matches string keys via startsWith in insertion order).
 const proxy = Object.fromEntries(
   cfg.servers.map((s, i) => [
-    `/api/s/${i}`,
+    new RegExp(`^/api/s/${i}(?=/|$)`),
     {
       target: s.url,
       changeOrigin: true,
-      rewrite: (path: string) => path.replace(`/api/s/${i}`, ""),
+      rewrite: (path: string) => path.replace(/^\/api\/s\/\d+/, ""),
     },
   ]),
 );

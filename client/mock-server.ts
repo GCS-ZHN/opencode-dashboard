@@ -2,7 +2,6 @@ import { serve } from "bun";
 import { loadDashboardConfig } from "./config";
 
 const PORT = Number(process.env.PORT ?? 8791);
-const { servers } = loadDashboardConfig();
 const T0 = 1785571208048;
 
 interface Tokens {

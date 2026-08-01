@@ -29,12 +29,17 @@ function baseDir(): string {
 export function loadDashboardConfig(
   path: string = process.env.DASHBOARD_CONFIG ?? join(baseDir(), "dashboard.yaml"),
 ): DashboardConfig {
-  const doc = YAML.parse(readFileSync(path, "utf8")) as DashboardConfig;
+  const doc = (YAML.parse(readFileSync(path, "utf8")) ?? {}) as DashboardConfig;
+  const port = Number(process.env.PORT ?? doc.port ?? 5173);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`invalid port in ${path}: ${String(doc.port)}`);
+  }
+  const sessionPage = Number(doc.ui?.sessionPage ?? 30);
   return {
     host: process.env.HOST ?? doc.host ?? "0.0.0.0",
-    port: Number(process.env.PORT ?? doc.port ?? 5173),
+    port,
     servers: doc.servers ?? [],
-    ui: { sessionPage: doc.ui?.sessionPage ?? 30 },
+    ui: { sessionPage: Number.isInteger(sessionPage) && sessionPage > 0 ? sessionPage : 30 },
   };
 }
 
