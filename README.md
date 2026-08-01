@@ -24,8 +24,8 @@ port 8791"]
 port 8792"]
     end
     S1 --> FE["front-end server
-bun server.ts (prod) / vite dev (dev)
-PORT 5173"]
+opencode-dashboard serve (CLI) / vite dev (dev)
+default :5173"]
     S2 --> FE
     FE -->|"GET /api/s/{i}/*"| B["browser"]
 ```
@@ -33,7 +33,7 @@ PORT 5173"]
 Notes:
 
 - Each aggregation server shells out to `opencode db "<SQL>"` on its own host — it never opens the SQLite file directly (the DB is WAL-mode and can be 300MB+; see *Development intent*).
-- The front-end server is the **only** endpoint the browser reaches. In dev, Vite's dev server generates the same proxy from `client/dashboard.yaml`; in production, `bun server.ts` serves `dist/` and proxies `/api/s/{i}/*` → the configured servers. The route scheme is identical in both, so switching is transparent. Real backends may be unreachable from the client's network — this indirection is deliberate. The SPA fetches the resolved server list + UI options from `GET /api/config` at startup, so changing `dashboard.yaml` (or its env overrides) is all a deployer touches.
+- The front-end server is the **only** endpoint the browser reaches. In dev, Vite's dev server generates the same proxy from the repo's `dashboard.yaml`; in production, `opencode-dashboard serve` serves `dist/` and proxies `/api/s/{i}/*` → the configured servers (XDG config, written by `opencode-dashboard configure`). The route scheme is identical in both, so switching is transparent. Real backends may be unreachable from the client's network — this indirection is deliberate. The SPA fetches the resolved server list + UI options from `GET /api/config` at startup, so changing config is all a deployer touches.
 - Live updates flow back over **SSE** (`/api/s/{i}/stream`), so the page refreshes itself as opencode writes new sessions.
 
 ## Features
@@ -68,70 +68,62 @@ bun install
 bun run build      # typecheck (tsc) + bundle (vite)
 ```
 
-### Install from registries (published packages)
+### Install from registries (published packages, CLI)
 
-- **Front end** — `npm install opencode-dashboard-client`. The package ships the built SPA plus the front-end server; run it from inside the package:
+Both packages install as **CLIs** — configure them interactively, no editing package files.
+
+- **Front end** — `npm install -g opencode-dashboard-client` (or `npx opencode-dashboard ...`):
   ```bash
-  cd node_modules/opencode-dashboard-client
-  # edit dashboard.yaml to point at your backends first
-  bun server.ts        # serves dist/ + proxies /api/s/{i}/* → your backends
+  opencode-dashboard configure   # interactive: add backends, port, host, ui → XDG config
+  opencode-dashboard serve       # start the front-end server (default http://localhost:5173/)
   ```
-- **Backend** — `pip install opencode-dashboard-server`, then run the aggregator as usual:
+- **Backend** — `uv tool install opencode-dashboard-server`, then on each opencode host:
   ```bash
-  uvicorn app:app --port 8791
+  opencode-dashboard-server configure   # interactive: port, host, CORS, poll → XDG config
+  opencode-dashboard-server serve       # start the aggregator (default port 8791)
   ```
+
+Runtime configuration lives in the **XDG config dir** (`~/.config/opencode-dashboard/`, front end
+`config.yaml` / back end `server.yaml`, shared directory, separate files), written by the
+`configure` command — never by editing files inside an installed package.
 
 ## Usage
 
-### 1. Configure the backends
+### 1. Configure and run the backends
 
-Edit `client/dashboard.yaml` — the servers to proxy (the SPA gets this list at runtime via
-`/api/config`; it is never bundled):
-
-```yaml
-host: 0.0.0.0        # front-end server bind (env HOST wins)
-port: 5173           # front-end server port (env PORT wins)
-servers:
-  - name: main
-    url: http://127.0.0.1:8791
-  - name: backup
-    url: http://127.0.0.1:8792
-ui:
-  sessionPage: 30    # sessions loaded per page when a project is expanded
-```
-
-`DASHBOARD_CONFIG` points the front-end server at a different file. The backend has its own env
-switches: `DASHBOARD_CORS_ORIGINS` (comma-separated CORS allow-list, defaults to the loopback dev
-origins), `DASHBOARD_POLL_SECONDS` (SSE poll interval, default 5), `OPENCODE_BIN` (opencode CLI path).
-
-### 2. Run one aggregation server per opencode host
-
-On each host that runs opencode (the server must be able to run `opencode db`):
+On each opencode host:
 
 ```bash
-cd server
-uv run uvicorn app:app --port 8791
+opencode-dashboard-server configure   # defaults are fine for a first run
+opencode-dashboard-server serve
 ```
 
-Run more hosts with different ports (e.g. `8792`, `8793`, `8794` — matching what you put in `config.ts`).
+`serve` accepts `--port N` / `--host H` / `--config PATH` overrides. Run more hosts with different
+ports (`8792`, `8793`, …) and list each of them in the front end's config next.
 
-### 3. Run the front end
-
-Development (Vite dev server, proxies `/api/s/{i}/*` from `config.ts`):
+### 2. Configure and run the front end
 
 ```bash
-cd client
-bun run dev        # open http://localhost:5173/
+opencode-dashboard configure   # add every backend: name + url; set port/host/sessionPage
+opencode-dashboard serve
 ```
 
-Production (serves the built `dist/` + the same proxy; `PORT` env, default 5173):
+The SPA fetches the server list + UI options from `GET /api/config` at startup — it never bundles
+them, so changing config and restarting `serve` is all it takes.
+
+## Development (from source)
 
 ```bash
-cd client
-bun run build && bun server.ts
+# server
+cd server && uv sync && uv run pytest && uvx ruff check .
+# client
+cd client && bun install && bun run dev   # Vite dev server reads the repo dashboard.yaml → :5173
+bun run build                              # typecheck (tsc) + bundle (vite) + CLI bundle
 ```
 
-Optional: `bun mock-server.ts` serves canned `API.md` JSON for frontend-only work.
+Dev uses the repo's `client/dashboard.yaml`; the published npm package never ships it — the installed
+CLI reads the XDG file written by `configure`. `bun mock-server.ts` serves canned `API.md` JSON for
+frontend-only work.
 
 ## Publishing
 

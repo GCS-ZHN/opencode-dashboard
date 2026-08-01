@@ -8,6 +8,8 @@ API for the dashboard front end.
 
 ```bash
 pip install opencode-dashboard-server
+# or with uv:
+uv tool install opencode-dashboard-server
 ```
 
 Requires:
@@ -18,14 +20,29 @@ Requires:
 
 ## Quick start
 
+Configure once (interactive; writes `~/.config/opencode-dashboard/server.yaml`), then serve:
+
+```bash
+opencode-dashboard-server configure
+opencode-dashboard-server serve
+```
+
+`configure` walks you through `port` (default `8791`), `host` (default `0.0.0.0`),
+`cors_origins` (comma-separated; empty = built-in loopback whitelist), `poll_seconds`
+(default `5`), and `opencode_bin` (default `opencode`). Empty input keeps the default.
+
+`serve` accepts overrides: `--port N`, `--host H`, `--config PATH` (instead of the XDG file).
+Precedence for port/host: CLI flag > env `PORT`/`HOST` > config file > default.
+
 Run one aggregator per opencode host:
 
 ```bash
 uvicorn app:app --port 8791
 ```
 
-Run on more hosts with different ports (`8792`, `8793`, …) and list each in the front end's
-`dashboard.yaml`. Environment switches:
+or directly with uvicorn (still works — reads env/defaults only). Run on more hosts with
+different ports (`8792`, `8793`, …) and list each in the front end's `dashboard.yaml`.
+Environment switches (used when no config file value is set):
 
 - `DASHBOARD_CORS_ORIGINS` — comma-separated CORS allow-list (defaults to the loopback dev origins `localhost/127.0.0.1:5173` and `:4173`; tighten or widen for your deployment).
 - `DASHBOARD_POLL_SECONDS` — SSE poll interval in seconds (default `5`).

@@ -7,6 +7,7 @@ __pycache__/
 
 # Build output
 dist/
+dist-cli/
 *.egg-info/
 
 # OS
