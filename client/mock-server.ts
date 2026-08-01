@@ -1,6 +1,8 @@
 import { serve } from "bun";
+import { loadDashboardConfig } from "./config";
 
-const PORT = 8791;
+const PORT = Number(process.env.PORT ?? 8791);
+const { servers } = loadDashboardConfig();
 const T0 = 1785571208048;
 
 interface Tokens {
@@ -186,6 +188,8 @@ function json(data: unknown, status = 200): Response {
   });
 }
 
+const cfg = loadDashboardConfig();
+
 serve({
   port: PORT,
   fetch(req) {
@@ -193,7 +197,14 @@ serve({
     console.log(`[req] ${req.method} ${url.pathname}`);
     if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
-    if (url.pathname === "/stream") {
+    // Front-end server surface: /api/config + /api/s/{i}/* (same route scheme
+    // as server.ts / vite.config.ts), returning canned data for any backend index.
+    if (url.pathname === "/api/config") return json({ servers: cfg.servers, ui: cfg.ui });
+
+    const m = url.pathname.match(/^\/api\/s\/\d+(\/.*)?$/);
+    const path = m ? (m[1] ?? "/") : url.pathname;
+
+    if (path === "/stream") {
       const source = {
         controller: null as ReadableStreamDefaultController | null,
         start(c: ReadableStreamDefaultController) {
@@ -219,18 +230,18 @@ serve({
       });
     }
 
-    if (url.pathname === "/health") return json({ status: "ok", version: "1.18.10" });
-    if (url.pathname === "/overview") return json(overview);
-    if (url.pathname === "/projects") return json(projects);
+    if (path === "/health") return json({ status: "ok", version: "1.18.10" });
+    if (path === "/overview") return json(overview);
+    if (path === "/projects") return json(projects);
 
-    const mProj = url.pathname.match(/^\/projects\/([^/]+)$/);
+    const mProj = path.match(/^\/projects\/([^/]+)$/);
     if (mProj) {
       const p = projects.find((x) => x.id === mProj[1]);
       if (!p) return json({ detail: "project not found" }, 404);
       return json({ project: p, sessions: sessions.filter((s) => s.projectId === p.id) });
     }
 
-    const mSes = url.pathname.match(/^\/sessions\/([^/]+)$/);
+    const mSes = path.match(/^\/sessions\/([^/]+)$/);
     if (mSes) {
       const d = sessionDetails[mSes[1]];
       if (!d) return json({ detail: "session not found" }, 404);

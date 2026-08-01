@@ -3,6 +3,7 @@ import type {
   ModelUsage,
   Project,
   ProjectDetail,
+  ServerConfig,
   ServerOverview,
   Session,
   SessionDetailResponse,
@@ -10,9 +11,10 @@ import type {
   UpdateEvent,
 } from "./api";
 import { el, fmtAgo, fmtCost, tokenCell } from "./render";
-import { servers } from "./config";
 
-const SESSION_PAGE = 30;
+let SESSION_PAGE = 30;
+let SERVERS: ServerConfig[] = [];
+let panels: ServerPanel[] = [];
 const ACCENTS = ["#58a6ff", "#3fb950", "#a371f7", "#d29922", "#f85149"];
 
 function parseEvent(e: MessageEvent): UpdateEvent | null {
@@ -64,7 +66,7 @@ class ServerPanel {
   private readonly base: string;
 
   constructor(private idx: number) {
-    this.base = servers[idx].url;
+    this.base = SERVERS[idx]?.url ?? "";
     this.root = el("section", "server");
     this.root.dataset.url = this.base;
   }
@@ -421,41 +423,54 @@ function statCost(value: number | null): HTMLElement {
 }
 
 const app = document.getElementById("app")!;
-if (servers.length > 1) app.classList.add("multi");
-const panels: ServerPanel[] = [];
-for (let i = 0; i < servers.length; i++) {
-  const panel = new ServerPanel(i);
-  panel.root.style.borderTop = `3px solid ${ACCENTS[i % ACCENTS.length]}`;
-  panels.push(panel);
-  app.appendChild(panel.root);
-  panel.start();
+
+async function boot(): Promise<void> {
+  let servers: ServerConfig[] = [];
+  try {
+    const cfg = await api.config();
+    servers = cfg.servers;
+    SESSION_PAGE = cfg.ui?.sessionPage ?? SESSION_PAGE;
+  } catch {
+    servers = []; // no front-end server / /api/config → render an error
+  }
+  SERVERS = servers;
+
+  if (servers.length > 1) app.classList.add("multi");
+  panels = [];
+  for (let i = 0; i < servers.length; i++) {
+    const panel = new ServerPanel(i);
+    panel.root.style.borderTop = `3px solid ${ACCENTS[i % ACCENTS.length]}`;
+    panels.push(panel);
+    app.appendChild(panel.root);
+    panel.start();
+  }
+
+  // Tabs: "Overall" = all servers side by side; one tab per server to focus it.
+  const OVERALL = "overall";
+  const tabs = el("nav", "tabs");
+  const tabBtns = new Map<string, HTMLButtonElement>();
+  const addTab = (label: string, key: string) => {
+    const b = el("button", "tab", label);
+    b.addEventListener("click", () => setView(key));
+    tabs.appendChild(b);
+    tabBtns.set(key, b);
+  };
+  addTab("Overall", OVERALL);
+  servers.forEach((s, i) => addTab(s.name, String(i)));
+  app.before(tabs);
+
+  function setView(key: string): void {
+    const overall = key === OVERALL;
+    app.classList.toggle("multi", overall && servers.length > 1);
+    panels.forEach((p, i) => {
+      p.root.hidden = !(overall || String(i) === key);
+    });
+    for (const [k, b] of tabBtns) b.classList.toggle("active", k === key);
+  }
+  setView(OVERALL);
 }
 
-// Tabs: "Overall" = all servers side by side; one tab per server to focus it.
-const OVERALL = "overall";
-const tabs = el("nav", "tabs");
-const tabBtns = new Map<string, HTMLButtonElement>();
-const addTab = (label: string, key: string) => {
-  const b = el("button", "tab", label);
-  b.addEventListener("click", () => setView(key));
-  tabs.appendChild(b);
-  tabBtns.set(key, b);
-};
-addTab("Overall", OVERALL);
-servers.forEach((s, i) => addTab(s.name, String(i)));
-app.before(tabs);
-
-let active: string = OVERALL;
-function setView(key: string): void {
-  active = key;
-  const overall = key === OVERALL;
-  app.classList.toggle("multi", overall && servers.length > 1);
-  panels.forEach((p, i) => {
-    p.root.hidden = !(overall || String(i) === key);
-  });
-  for (const [k, b] of tabBtns) b.classList.toggle("active", k === key);
-}
-setView(OVERALL);
+void boot();
 
 setInterval(() => {
   for (const p of panels) p.touch();

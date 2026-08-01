@@ -33,7 +33,7 @@ PORT 5173"]
 Notes:
 
 - Each aggregation server shells out to `opencode db "<SQL>"` on its own host — it never opens the SQLite file directly (the DB is WAL-mode and can be 300MB+; see *Development intent*).
-- The front-end server is the **only** endpoint the browser reaches. In dev, Vite's dev server generates the same proxy from `client/src/config.ts`; in production, `bun server.ts` serves `dist/` and proxies `/api/s/{i}/*` → `servers[i].url`. The route scheme is identical in both, so switching is transparent. Real backends may be unreachable from the client's network — this indirection is deliberate.
+- The front-end server is the **only** endpoint the browser reaches. In dev, Vite's dev server generates the same proxy from `client/dashboard.yaml`; in production, `bun server.ts` serves `dist/` and proxies `/api/s/{i}/*` → the configured servers. The route scheme is identical in both, so switching is transparent. Real backends may be unreachable from the client's network — this indirection is deliberate. The SPA fetches the resolved server list + UI options from `GET /api/config` at startup, so changing `dashboard.yaml` (or its env overrides) is all a deployer touches.
 - Live updates flow back over **SSE** (`/api/s/{i}/stream`), so the page refreshes itself as opencode writes new sessions.
 
 ## Features
@@ -73,7 +73,7 @@ bun run build      # typecheck (tsc) + bundle (vite)
 - **Front end** — `npm install opencode-dashboard-client`. The package ships the built SPA plus the front-end server; run it from inside the package:
   ```bash
   cd node_modules/opencode-dashboard-client
-  # edit src/config.ts to point at your backends first
+  # edit dashboard.yaml to point at your backends first
   bun server.ts        # serves dist/ + proxies /api/s/{i}/* → your backends
   ```
 - **Backend** — `pip install opencode-dashboard-server`, then run the aggregator as usual:
@@ -85,14 +85,24 @@ bun run build      # typecheck (tsc) + bundle (vite)
 
 ### 1. Configure the backends
 
-Edit `client/src/config.ts` — the `servers` array, one entry per backend:
+Edit `client/dashboard.yaml` — the servers to proxy (the SPA gets this list at runtime via
+`/api/config`; it is never bundled):
 
-```ts
-export const servers: ServerConfig[] = [
-  { name: "main", url: "http://127.0.0.1:8791" },
-  { name: "backup", url: "http://127.0.0.1:8792" },
-];
+```yaml
+host: 0.0.0.0        # front-end server bind (env HOST wins)
+port: 5173           # front-end server port (env PORT wins)
+servers:
+  - name: main
+    url: http://127.0.0.1:8791
+  - name: backup
+    url: http://127.0.0.1:8792
+ui:
+  sessionPage: 30    # sessions loaded per page when a project is expanded
 ```
+
+`DASHBOARD_CONFIG` points the front-end server at a different file. The backend has its own env
+switches: `DASHBOARD_CORS_ORIGINS` (comma-separated CORS allow-list, defaults to the loopback dev
+origins), `DASHBOARD_POLL_SECONDS` (SSE poll interval, default 5), `OPENCODE_BIN` (opencode CLI path).
 
 ### 2. Run one aggregation server per opencode host
 
@@ -127,7 +137,7 @@ Optional: `bun mock-server.ts` serves canned `API.md` JSON for frontend-only wor
 
 Both packages are published from this repo by GitHub Actions when you push a version tag:
 
-- **npm** — `opencode-dashboard-client` (built `dist/` + `server.ts` + `src/config.ts`), published from `client/`.
+- **npm** — `opencode-dashboard-client` (built `dist/` + `server.ts` + `config.ts` + `dashboard.yaml`), published from `client/`.
 - **PyPI** — `opencode-dashboard-server` (wheel containing the `app` / `aggregate` / `db` modules), built in `server/`.
 
 ### One-time secrets

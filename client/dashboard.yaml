@@ -1,0 +1,25 @@
+# opencode-dashboard front-end server configuration.
+# The front-end server (bun server.ts) and the vite dev server read this file.
+# Everything a user might want to change lives here; env vars (PORT, HOST,
+# DASHBOARD_CONFIG) override the matching fields. The SPA receives the resolved
+# servers + ui options at runtime via GET /api/config (it never bundles them).
+
+# Front-end server bind address (env HOST wins; default 0.0.0.0)
+host: 0.0.0.0
+# Front-end server port (env PORT wins; default 5173)
+port: 5173
+
+# Aggregation backends to proxy as /api/s/{index}/*
+servers:
+  - name: main
+    url: http://127.0.0.1:8791
+  - name: backup
+    url: http://127.0.0.1:8792
+  - name: dev
+    url: http://127.0.0.1:8793
+  - name: staging
+    url: http://127.0.0.1:8794
+
+# Browser-side UI options, delivered to the SPA via /api/config
+ui:
+  sessionPage: 30   # sessions loaded per page when a project is expanded

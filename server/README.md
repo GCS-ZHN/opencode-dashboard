@@ -24,6 +24,12 @@ uvicorn app:app --port 8791
 
 Run on more hosts with different ports (`8792`, `8793`, …) and point the front end at each.
 
+Environment switches:
+
+- `DASHBOARD_CORS_ORIGINS` — comma-separated CORS allow-list (defaults to the loopback dev origins `localhost/127.0.0.1:5173` and `:4173`; tighten or widen for your deployment).
+- `DASHBOARD_POLL_SECONDS` — SSE poll interval in seconds (default `5`).
+- `OPENCODE_BIN` — path to the `opencode` binary if it's not on `PATH`.
+
 ## API
 
 - `GET /health` — liveness

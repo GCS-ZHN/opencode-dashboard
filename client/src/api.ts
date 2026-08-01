@@ -71,6 +71,16 @@ export interface UpdateEvent {
   id?: string;
 }
 
+export interface ServerConfig {
+  name: string;
+  url: string;
+}
+
+export interface DashboardConfigResponse {
+  servers: ServerConfig[];
+  ui?: { sessionPage?: number };
+}
+
 async function getJson<T>(base: string, path: string): Promise<T> {
   const res = await fetch(base + path);
   if (!res.ok) {
@@ -92,6 +102,7 @@ export function baseOf(idx: number): string {
 }
 
 export const api = {
+  config: () => getJson<DashboardConfigResponse>("/", "api/config"),
   overview: (idx: number) => getJson<ServerOverview>(baseOf(idx), "/overview"),
   projects: (idx: number) => getJson<Project[]>(baseOf(idx), "/projects"),
   project: (idx: number, id: string) => getJson<ProjectDetail>(baseOf(idx), `/projects/${encodeURIComponent(id)}`),

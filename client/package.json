@@ -6,7 +6,8 @@
   "files": [
     "dist",
     "server.ts",
-    "src/config.ts"
+    "config.ts",
+    "dashboard.yaml"
   ],
   "publishConfig": {
     "access": "public"
@@ -17,6 +18,9 @@
     "preview": "vite preview",
     "mock": "bun mock-server.ts",
     "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "yaml": "^2.8.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0",

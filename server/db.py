@@ -11,7 +11,11 @@ Two interchangeable runners over the same SQL surface:
 """
 
 import json
+import os
 import subprocess
+
+# opencode CLI binary; override for a non-PATH install (e.g. a brew cellar path).
+OPENCODE_BIN = os.environ.get("OPENCODE_BIN", "opencode")
 
 
 def _inline(sql: str, params: tuple) -> str:
@@ -29,8 +33,8 @@ def _inline(sql: str, params: tuple) -> str:
 
 
 class CliRunner:
-    def __init__(self, executable: str = "opencode"):
-        self._cmd = [executable, "db"]
+    def __init__(self, executable: str | None = None):
+        self._cmd = [executable or OPENCODE_BIN, "db"]
 
     def query(self, sql: str, params: tuple = ()) -> list[dict]:
         raw = subprocess.run(

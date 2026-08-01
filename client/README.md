@@ -18,17 +18,21 @@ Requires Node ≥ 22 and [bun](https://bun.sh) (the front-end server runs on bun
 
 ## Usage
 
-1. Point the front-end server at your backends — edit `src/config.ts`:
-   ```ts
-   export const servers = [
-     { name: "main", url: "http://127.0.0.1:8791" },
-     { name: "backup", url: "http://127.0.0.1:8792" },
-   ];
+1. Point the front-end server at your backends — edit `dashboard.yaml`:
+   ```yaml
+   servers:
+     - name: main
+       url: http://127.0.0.1:8791
+     - name: backup
+       url: http://127.0.0.1:8792
    ```
 2. Run the front-end server (serves the built SPA + proxies `/api/s/{i}/*`):
    ```bash
-   bun server.ts        # PORT env, default 5173 → open http://localhost:5173/
+   bun server.ts        # PORT env / HOST env / DASHBOARD_CONFIG env, defaults 5173
    ```
+
+The SPA fetches the server list + UI options from `GET /api/config` at startup, so `dashboard.yaml`
+is the single file you edit (override its path with `DASHBOARD_CONFIG`).
 
 Each configured backend is one tab (with an **Overall** tab showing all of them in a grid). Sessions
 render as parent/child trees — subagents are collapsed by default and a parent's totals include all

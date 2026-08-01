@@ -6,6 +6,7 @@ Run:  uv run uvicorn app:app --reload
 import asyncio
 import json
 import logging
+import os
 import socket
 import subprocess
 from functools import lru_cache
@@ -18,6 +19,20 @@ import aggregate
 from db import CliRunner
 
 logger = logging.getLogger("dashboard")
+
+# Comma-separated CORS allow-list; defaults to the loopback dev origins. Tight
+# by default so a random webpage can't exfiltrate local project/session data.
+def cors_origins() -> list[str]:
+    env = os.environ.get("DASHBOARD_CORS_ORIGINS", "").strip()
+    if env:
+        return [o.strip() for o in env.split(",") if o.strip()]
+    return [
+        "http://localhost:5173", "http://127.0.0.1:5173",
+        "http://localhost:4173", "http://127.0.0.1:4173",
+    ]
+
+
+POLL_SECONDS = float(os.environ.get("DASHBOARD_POLL_SECONDS", "5"))
 
 
 @lru_cache(maxsize=1)
@@ -37,10 +52,7 @@ def create_app(runner=None) -> FastAPI:
     # local project/session data from the browser (the client runs from Vite).
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173", "http://127.0.0.1:5173",
-            "http://localhost:4173", "http://127.0.0.1:4173",
-        ],
+        allow_origins=cors_origins(),
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -116,7 +128,7 @@ def create_app(runner=None) -> FastAPI:
                 except Exception:
                     logger.exception("stream poll failed")
                 try:
-                    await asyncio.wait_for(stop.wait(), 5)
+                    await asyncio.wait_for(stop.wait(), POLL_SECONDS)
                 except asyncio.TimeoutError:
                     pass
 
