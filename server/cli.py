@@ -32,7 +32,10 @@ def load_config(path: Path) -> dict:
 
 def _prompt(label: str, current, default) -> str:
     hint = current if current != "" else default
-    value = input(f"{label} [{hint}]: ").strip()
+    try:
+        value = input(f"{label} [{hint}]: ").strip()
+    except EOFError:
+        return hint
     return value if value else hint
 
 
@@ -74,14 +77,21 @@ def cmd_configure(args) -> None:
 def cmd_serve(args) -> None:
     path = args.config or config_path()
     cfg = load_config(path)
-    port = args.port or int(os.environ.get("PORT") or cfg.get("port") or 8791)
+    try:
+        port = args.port or int(os.environ.get("PORT") or cfg.get("port") or 8791)
+    except ValueError:
+        print(f"invalid port: {os.environ.get('PORT') or cfg.get('port')!r}")
+        sys.exit(2)
     host = args.host or os.environ.get("HOST") or cfg.get("host") or "0.0.0.0"
 
     import uvicorn
 
+    # cors_origins is stored comma-separated; create_app expects a list.
+    cors = [o.strip() for o in str(cfg.get("cors_origins", "")).split(",") if o.strip()]
+
     uvicorn.run(
         create_app(
-            cors_origins=cfg.get("cors_origins") or None,
+            cors_origins=cors or None,
             poll_seconds=cfg.get("poll_seconds"),
             opencode_bin=cfg.get("opencode_bin") or None,
         ),

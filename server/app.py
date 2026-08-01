@@ -32,21 +32,20 @@ def default_cors_origins() -> list[str]:
     ]
 
 
-@lru_cache(maxsize=1)
-def opencode_version() -> str:
+@lru_cache(maxsize=8)
+def opencode_version(executable: str = "opencode") -> str:
     try:
         return subprocess.run(
-            ["opencode", "--version"], capture_output=True, text=True, check=True
+            [executable, "--version"], capture_output=True, text=True, check=True
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"  # e.g. CI without the opencode CLI; don't fail the request
 
 
 def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=None) -> FastAPI:
+    bin = opencode_bin or os.environ.get("OPENCODE_BIN") or "opencode"
     if runner is None:
-        runner = CliRunner(
-            executable=opencode_bin or os.environ.get("OPENCODE_BIN") or "opencode"
-        )
+        runner = CliRunner(executable=bin)
     origins = cors_origins if cors_origins is not None else default_cors_origins()
     if poll_seconds is None:
         try:
@@ -74,14 +73,14 @@ def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=N
 
     @app.get("/health")
     def health():
-        return {"status": "ok", "version": opencode_version()}
+        return {"status": "ok", "version": opencode_version(bin)}
 
     @app.get("/overview")
     def overview():
         def run():
             data = aggregate.overview(runner)
             data["host"] = socket.gethostname()
-            data["opencodeVersion"] = opencode_version()
+            data["opencodeVersion"] = opencode_version(bin)
             return data
 
         return handle(run)

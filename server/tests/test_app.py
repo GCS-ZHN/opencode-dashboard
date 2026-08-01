@@ -46,3 +46,15 @@ def test_foreign_origin_not_allowed_by_cors():
         "Access-Control-Request-Method": "GET",
     })
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_cors_origins_injection():
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.executescript(SCHEMA)
+    seed(conn)
+    app = appmod.create_app(SqliteRunner(conn), cors_origins=["http://a.com"])
+    c = TestClient(app)
+    ok = c.options("/projects", headers={"Origin": "http://a.com", "Access-Control-Request-Method": "GET"})
+    assert ok.headers.get("access-control-allow-origin") == "http://a.com"
+    nope = c.options("/projects", headers={"Origin": "http://a.co", "Access-Control-Request-Method": "GET"})
+    assert "access-control-allow-origin" not in nope.headers

@@ -129,8 +129,8 @@ frontend-only work.
 
 Both packages are published from this repo by GitHub Actions when you push a version tag:
 
-- **npm** — `opencode-dashboard-client` (built `dist/` + `server.ts` + `config.ts` + `dashboard.yaml`), published from `client/`.
-- **PyPI** — `opencode-dashboard-server` (wheel containing the `app` / `aggregate` / `db` modules), built in `server/`.
+- **npm** — `opencode-dashboard-client` (built `dist/` + `dist-cli/` CLI bundle, `bin: opencode-dashboard`), published from `client/`.
+- **PyPI** — `opencode-dashboard-server` (wheel containing the `app` / `aggregate` / `db` / `cli` modules, console script `opencode-dashboard-server`), built in `server/`.
 
 ### One-time secrets
 
@@ -154,7 +154,7 @@ gh secret set PYPI_API_TOKEN  # PyPI API token (project-scoped)
 
 Two deliberate design decisions:
 
-1. **Single front-end entry point (proxy).** The browser never talks to the real aggregation backends — they may be unreachable from the client's network. Instead the front-end server (Vite in dev, `bun server.ts` in prod) proxies `/api/s/{i}/*` → `servers[i].url`, so one page can show backends spread across machines. Client code uses relative `/api/s/{i}` paths only — no backend URLs reach the browser.
+1. **Single front-end entry point (proxy).** The browser never talks to the real aggregation backends — they may be unreachable from the client's network. Instead the front-end server (Vite in dev, `opencode-dashboard serve` in prod) proxies `/api/s/{i}/*` → the configured servers (XDG config), so one page can show backends spread across machines. Client code uses relative `/api/s/{i}` paths only — no backend URLs reach the browser.
 
 2. **Data source via the `opencode db` CLI, never direct file access.** opencode's SQLite store is WAL-mode, grows past 300MB, and is actively written while opencode runs. Opening it directly risks lock contention and torn reads. Every aggregation query goes through `opencode db "<SQL>" --format json|tsv` (schema and gotchas are documented in `AGENTS.md`); re-verify the schema before touching aggregation logic, since opencode table columns change between versions.
 

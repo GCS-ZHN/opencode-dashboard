@@ -41,7 +41,7 @@ uvicorn app:app --port 8791
 ```
 
 or directly with uvicorn (still works — reads env/defaults only). Run on more hosts with
-different ports (`8792`, `8793`, …) and list each in the front end's `dashboard.yaml`.
+different ports (`8792`, `8793`, …) and list each in the front end's config (`opencode-dashboard configure`).
 Environment switches (used when no config file value is set):
 
 - `DASHBOARD_CORS_ORIGINS` — comma-separated CORS allow-list (defaults to the loopback dev origins `localhost/127.0.0.1:5173` and `:4173`; tighten or widen for your deployment).

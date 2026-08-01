@@ -197,7 +197,7 @@ serve({
     if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
 
     // Front-end server surface: /api/config + /api/s/{i}/* (same route scheme
-    // as server.ts / vite.config.ts), returning canned data for any backend index.
+    // as cli.ts / vite.config.ts), returning canned data for any backend index.
     if (url.pathname === "/api/config") return json({ servers: cfg.servers, ui: cfg.ui });
 
     const m = url.pathname.match(/^\/api\/s\/\d+(\/.*)?$/);
