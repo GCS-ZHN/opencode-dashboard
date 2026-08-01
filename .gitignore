@@ -1,0 +1,15 @@
+# Dependencies / virtualenvs
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Build output
+dist/
+
+# OS
+.DS_Store
+
+# Codegraph
+.codegraph/
