@@ -30,7 +30,7 @@ opencode db "<SQL>" --format json   # or --format tsv for big pulls
 
 思路一 (own aggregator over `opencode db`) was chosen; 思路二 (opencode `serve` API) was rejected because full-history enumeration rides undocumented routes (`/api/session`, `/experimental/session`) that break on upgrades.
 
-- **Per-host backend** = FastAPI aggregator (`server/`). Reads storage via `opencode db`, exposes `API.md` endpoints + SSE `/stream`.
+- **Per-host backend** = FastAPI aggregator (`server/`). Reads storage via `opencode db`, exposes `API.md` endpoints + SSE `/stream`. **Cached aggregation**: results are computed on first request, then refreshed by a background loop every `poll_seconds` (default 5) into an in-memory `Cache` (in `app.py`, keyed by `(kind, id)`); requests serve cached values, a failed refresh keeps the stale value, and `/stream` is driven by the refresh loop via a `StreamHub` (subscribers never query the DB).
 - **Front-end server = single entry point.** The browser only talks to the front-end server (never real backends — they may be unreachable from the client's network). It proxies `/api/s/{i}/*` → the i-th configured backend and exposes `GET /api/config` (servers + ui options), which the SPA fetches at startup — **no backend URLs are ever bundled into the browser**.
 - Both `server.ts`/CLI serve and the Vite dev server share the same `/api/s/{i}` route scheme, so dev↔prod switching is transparent.
 
@@ -64,7 +64,7 @@ opencode db "<SQL>" --format json   # or --format tsv for big pulls
 Installed packages are configured via interactive `configure`, writing to the **shared XDG dir** `~/.config/opencode-dashboard/` — front-end `config.yaml`, back-end `server.yaml`. There is deliberately **no in-package config file**; do not edit files inside `node_modules`/venv to configure.
 
 - Front-end `opencode-dashboard`: `configure` (interactive wizard) + `serve [--port] [--host]`. Config precedence: `DASHBOARD_CONFIG` env > repo `client/dashboard.yaml` (dev only, not shipped) > XDG `config.yaml` > defaults (port 5173, host 0.0.0.0, sessionPage 30).
-- Back-end `opencode-dashboard-server`: `configure` + `serve [--port] [--host] [--config PATH]`. Precedence: `--config` > XDG `server.yaml` > env > defaults. Env switches: `DASHBOARD_CORS_ORIGINS` (comma-separated, default = loopback whitelist), `DASHBOARD_POLL_SECONDS` (default 5), `OPENCODE_BIN`, `PORT`, `HOST`.
+- Back-end `opencode-dashboard-server`: `configure` + `serve [--port] [--host] [--config PATH]`. Precedence: `--config` > XDG `server.yaml` > env > defaults. Env switches: `DASHBOARD_CORS_ORIGINS` (comma-separated, default = loopback whitelist), `DASHBOARD_POLL_SECONDS` (default 5; the cache-refresh interval), `OPENCODE_BIN`, `PORT`, `HOST`.
 - `configure` must work from a **piped stdin** (EOF → use default), not just interactive TTY.
 
 ## Layout & stack
