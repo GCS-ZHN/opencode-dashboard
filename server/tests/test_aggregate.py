@@ -1,6 +1,7 @@
 """Assert-based tests for the aggregation logic, driven via SqliteRunner."""
 
 from aggregate import (
+    models,
     normalize_model,
     overview,
     project_detail,
@@ -74,7 +75,10 @@ def test_project_detail_flat_sessions(runner):
 def test_session_detail_model_breakdown(runner):
     sess, models = session_detail(runner, "s4")
     assert sess["cost"] == 0.9
-    assert [m["model"] for m in models] == ["deepseek-v4-flash", "claude-sonnet-4.5"]
+    # per-session breakdown keeps (model, provider, mode) granularity, so the
+    # deepseek/build + openrouter/plan pair for the same model id stays split
+    assert [m["model"] for m in models] == ["deepseek-v4-flash", "claude-sonnet-4.5", "deepseek-v4-flash"]
+    assert [m["provider"] for m in models] == ["deepseek", "opencode", "openrouter"]
     flash = models[0]
     assert flash["provider"] == "deepseek"
     assert flash["mode"] == "build"
@@ -87,6 +91,13 @@ def test_session_detail_model_breakdown(runner):
     assert claude["tokens"] == {"input": 200, "output": 100, "reasoning": 50,
                                 "cacheRead": 0, "cacheWrite": 0, "total": 350}
     assert claude["cost"] == 0.3
+    flash2 = models[2]
+    assert flash2["provider"] == "openrouter"
+    assert flash2["mode"] == "plan"
+    assert flash2["messageCount"] == 1
+    assert flash2["tokens"] == {"input": 50, "output": 20, "reasoning": 10,
+                                "cacheRead": 5, "cacheWrite": 2, "total": 87}
+    assert flash2["cost"] == 0.1
 
 
 def test_zero_token_session_is_zeros_not_null(runner):
@@ -114,3 +125,27 @@ def test_normalize_model():
 def test_unknown_ids_return_none(runner):
     assert project_detail(runner, "nope") is None
     assert session_detail(runner, "nope") is None
+
+
+def test_models_hostwide_rollup(runner):
+    ms = models(runner)
+    # ordered by cost desc (tie by model name); user message in m5 excluded
+    assert [m["model"] for m in ms] == ["deepseek-v4-flash", "claude-sonnet-4.5", "kimi-k3"]
+    flash = ms[0]
+    # m1+m2 (deepseek/build) and m6 (openrouter/plan) share a model id; the
+    # host-wide rollup merges them into one entry, keeping the higher-cost label
+    assert flash["provider"] == "deepseek"
+    assert flash["mode"] == "build"
+    assert flash["messageCount"] == 3  # m1 + m2 + m6, not the m5 user message
+    assert flash["tokens"] == {"input": 250, "output": 120, "reasoning": 60,
+                               "cacheRead": 25, "cacheWrite": 12, "total": 467}
+    assert flash["cost"] == 0.7
+    claude = ms[1]
+    assert claude["provider"] == "opencode"
+    assert claude["messageCount"] == 1
+    assert claude["tokens"]["total"] == 350
+    assert claude["cost"] == 0.3
+    kimi = ms[2]
+    assert kimi["messageCount"] == 1  # only m4; the m5 user message is excluded
+    assert kimi["tokens"] == ZERO_TOKENS
+    assert kimi["cost"] == 0.0

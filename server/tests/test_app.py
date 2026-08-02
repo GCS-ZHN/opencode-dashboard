@@ -39,6 +39,16 @@ def test_overview_keys():
             "tokens", "cost", "updatedAt"} <= set(r.json())
 
 
+def test_models_keys():
+    c, _ = make_client()
+    r = c.get("/models")
+    assert r.status_code == 200
+    rows = r.json()
+    assert rows  # fixture seeds assistant token-bearing messages
+    assert {"model", "provider", "mode", "messageCount", "tokens", "cost"} <= set(rows[0])
+    assert rows == sorted(rows, key=lambda m: (-m["cost"], m["model"] or ""))
+
+
 def test_foreign_origin_not_allowed_by_cors():
     c, _ = make_client()
     r = c.options("/projects", headers={

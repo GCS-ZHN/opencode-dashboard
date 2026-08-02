@@ -155,6 +155,25 @@ const overview: Record<string, unknown> = {
   updatedAt: Date.now(),
 };
 
+const models = [
+  {
+    model: "claude-sonnet-4-5",
+    provider: "anthropic",
+    mode: "build",
+    messageCount: 29,
+    tokens: T(103000, 34000, 19000, 49000, 5000),
+    cost: 0.0883,
+  },
+  {
+    model: "deepseek-v4-flash",
+    provider: "deepseek",
+    mode: "build",
+    messageCount: 12,
+    tokens: T(35000, 10000, 7000, 50000, 2000),
+    cost: 0.0111,
+  },
+];
+
 const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*" };
 const enc = new TextEncoder();
 const clients = new Set<ReadableStreamDefaultController>();
@@ -232,6 +251,7 @@ serve({
     if (path === "/health") return json({ status: "ok", version: "1.18.10" });
     if (path === "/overview") return json(overview);
     if (path === "/projects") return json(projects);
+    if (path === "/models") return json(models);
 
     const mProj = path.match(/^\/projects\/([^/]+)$/);
     if (mProj) {

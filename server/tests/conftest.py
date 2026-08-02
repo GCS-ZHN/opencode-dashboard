@@ -117,6 +117,11 @@ def seed(conn):
             {"input": 200, "output": 100, "reasoning": 50, "cache": {"read": 0, "write": 0}},
             0.30, 143000, 165000)
 
+    # m6: same model id under a different provider/mode (host-wide merge case)
+    add_msg(conn, "m6", "s4", "assistant", "deepseek-v4-flash", "openrouter", "plan",
+            {"input": 50, "output": 20, "reasoning": 10, "cache": {"read": 5, "write": 2}},
+            0.10, 144000, 165000)
+
     # s5: assistant message with all-zero tokens + a user message (filtered out)
     add_msg(conn, "m4", "s5", "assistant", "kimi-k3", "opencode", "general",
             {"input": 0, "output": 0, "reasoning": 0, "cache": {"read": 0, "write": 0}},
