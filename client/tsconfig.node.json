@@ -9,7 +9,8 @@
     "noEmit": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true
   },
-  "include": ["cli.ts", "config.ts", "mock-server.ts", "vite.config.ts"]
+  "include": ["cli.ts", "config.ts", "mcp.ts", "mock-server.ts", "vite.config.ts"]
 }

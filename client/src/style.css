@@ -173,6 +173,28 @@ body {
   animation: pulse 2s infinite;
 }
 
+.mcp {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 7px;
+  cursor: pointer;
+  user-select: none;
+  transition: color 120ms, border-color 120ms;
+}
+
+.mcp:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.mcp.copied {
+  color: var(--live);
+  border-color: var(--live);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .live.on {
     animation: none;

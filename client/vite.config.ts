@@ -1,5 +1,6 @@
 import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import { loadDashboardConfig } from "./config";
+import { createMcpHandler } from "./mcp";
 
 // Front-end server (dev): browser only talks to this dev server. Requests to
 // /api/s/{i}/* are proxied to the configured backends, and /api/config serves
@@ -20,6 +21,7 @@ cfg.servers.forEach((s, i) => {
 });
 
 function apiConfigPlugin(): Plugin {
+  const mcpHandler = createMcpHandler(cfg);
   return {
     name: "api-config",
     configureServer(server) {
@@ -27,6 +29,9 @@ function apiConfigPlugin(): Plugin {
         res.setHeader("content-type", "application/json");
         res.end(JSON.stringify({ servers: cfg.servers, ui: cfg.ui }));
       });
+      // /mcp + /mcp/ both reach the shared MCP handler (connect middleware
+      // mounts it at /mcp, matching any sub-path).
+      server.middlewares.use("/mcp", (req, res) => void mcpHandler(req, res));
     },
   };
 }
