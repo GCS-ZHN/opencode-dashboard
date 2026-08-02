@@ -81,6 +81,20 @@ export interface DashboardConfigResponse {
   ui?: { sessionPage?: number };
 }
 
+/** Half-open [since, until) window in epoch-ms; either side may be omitted. */
+export interface TimeRange {
+  since?: number;
+  until?: number;
+}
+
+function qs(range?: TimeRange): string {
+  if (!range || (range.since === undefined && range.until === undefined)) return "";
+  const p = new URLSearchParams();
+  if (range.since !== undefined) p.set("since", String(range.since));
+  if (range.until !== undefined) p.set("until", String(range.until));
+  return `?${p}`;
+}
+
 async function getJson<T>(base: string, path: string): Promise<T> {
   const res = await fetch(base + path);
   if (!res.ok) {
@@ -103,10 +117,11 @@ export function baseOf(idx: number): string {
 
 export const api = {
   config: () => getJson<DashboardConfigResponse>("/", "api/config"),
-  overview: (idx: number) => getJson<ServerOverview>(baseOf(idx), "/overview"),
-  projects: (idx: number) => getJson<Project[]>(baseOf(idx), "/projects"),
-  models: (idx: number) => getJson<ModelUsage[]>(baseOf(idx), "/models"),
-  project: (idx: number, id: string) => getJson<ProjectDetail>(baseOf(idx), `/projects/${encodeURIComponent(id)}`),
-  session: (idx: number, id: string) =>
-    getJson<SessionDetailResponse>(baseOf(idx), `/sessions/${encodeURIComponent(id)}`),
+  overview: (idx: number, range?: TimeRange) => getJson<ServerOverview>(baseOf(idx), "/overview" + qs(range)),
+  projects: (idx: number, range?: TimeRange) => getJson<Project[]>(baseOf(idx), "/projects" + qs(range)),
+  models: (idx: number, range?: TimeRange) => getJson<ModelUsage[]>(baseOf(idx), "/models" + qs(range)),
+  project: (idx: number, id: string, range?: TimeRange) =>
+    getJson<ProjectDetail>(baseOf(idx), `/projects/${encodeURIComponent(id)}${qs(range)}`),
+  session: (idx: number, id: string, range?: TimeRange) =>
+    getJson<SessionDetailResponse>(baseOf(idx), `/sessions/${encodeURIComponent(id)}${qs(range)}`),
 };

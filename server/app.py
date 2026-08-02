@@ -11,7 +11,7 @@ import socket
 import subprocess
 from functools import lru_cache
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
@@ -76,9 +76,9 @@ def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=N
         return {"status": "ok", "version": opencode_version(bin)}
 
     @app.get("/overview")
-    def overview():
+    def overview(since: int | None = Query(None), until: int | None = Query(None)):
         def run():
-            data = aggregate.overview(runner)
+            data = aggregate.overview(runner, since, until)
             data["host"] = socket.gethostname()
             data["opencodeVersion"] = opencode_version(bin)
             return data
@@ -86,17 +86,17 @@ def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=N
         return handle(run)
 
     @app.get("/projects")
-    def projects():
-        return handle(lambda: aggregate.projects(runner))
+    def projects(since: int | None = Query(None), until: int | None = Query(None)):
+        return handle(lambda: aggregate.projects(runner, since, until))
 
     @app.get("/models")
-    def models():
-        return handle(lambda: aggregate.models(runner))
+    def models(since: int | None = Query(None), until: int | None = Query(None)):
+        return handle(lambda: aggregate.models(runner, since, until))
 
     @app.get("/projects/{project_id}")
-    def project(project_id: str):
+    def project(project_id: str, since: int | None = Query(None), until: int | None = Query(None)):
         def run():
-            res = aggregate.project_detail(runner, project_id)
+            res = aggregate.project_detail(runner, project_id, since, until)
             if res is None:
                 raise HTTPException(404, detail=f"project {project_id} not found")
             proj, sessions = res
@@ -105,9 +105,9 @@ def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=N
         return handle(run)
 
     @app.get("/sessions/{session_id}")
-    def session(session_id: str):
+    def session(session_id: str, since: int | None = Query(None), until: int | None = Query(None)):
         def run():
-            res = aggregate.session_detail(runner, session_id)
+            res = aggregate.session_detail(runner, session_id, since, until)
             if res is None:
                 raise HTTPException(404, detail=f"session {session_id} not found")
             sess, models = res
