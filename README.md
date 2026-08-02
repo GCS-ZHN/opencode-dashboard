@@ -1,5 +1,9 @@
 # opencode-dashboard
 
+[![npm version](https://img.shields.io/npm/v/opencode-dashboard-client)](https://www.npmjs.com/package/opencode-dashboard-client)[![npm - Node version](https://img.shields.io/node/v/opencode-dashboard-client)](https://www.npmjs.com/package/opencode-dashboard-client)
+[![PyPI version](https://img.shields.io/pypi/v/opencode-dashboard-server)](https://pypi.org/project/opencode-dashboard-server/)[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/opencode-dashboard-server)](https://pypi.org/project/opencode-dashboard-server/)
+[![CI](https://github.com/GCS-ZHN/opencode-dashboard/actions/workflows/ci.yml/badge.svg)](https://github.com/GCS-ZHN/opencode-dashboard/actions/workflows/ci.yml)
+
 A dashboard that visualizes opencode token usage — drill down from **server → project → session → model** and see input / output / reasoning / cache tokens and cost for each level.
 
 ## Overview

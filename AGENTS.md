@@ -1,56 +1,63 @@
 # AGENTS.md
 
-Dashboard that visualizes opencode token usage — drill-down across server → project → session → model, showing input/output/reasoning/cache tokens and cost. Server (`server/`) + client (`client/`) are built and working against the contract in `API.md`. This file records the verified data-source facts and conventions so future sessions build against reality, not assumptions.
+Dashboard that visualizes opencode token usage — drill-down across server → project → session → model (input/output/reasoning/cache tokens + cost). Both packages are **built, published, and deployed as CLIs** (v0.3.0): npm `opencode-dashboard-client` → `opencode-dashboard`, PyPI `opencode-dashboard-server` → `opencode-dashboard-server`. This file records the verified facts and conventions so future sessions build against reality, not assumptions.
 
 ## Data source: opencode's SQLite storage
 
-The source of truth is opencode's local DB, queried via the `opencode db` CLI:
+Source of truth is opencode's local DB, queried only via the CLI:
 
 ```
-opencode db "<SQL>" --format json   # or --format tsv
+opencode db "<SQL>" --format json   # or --format tsv for big pulls
 ```
 
-- Storage lives at `~/.local/share/opencode/opencode.db` (SQLite, WAL mode; can be 300MB+). **Always use the `opencode db` wrapper** — never open the file directly while opencode is running (WAL/locking).
-- Seed/reference logic: `~/Downloads/export_token_usage.py` — per-message aggregation + parent/child session tree. The server's SQL was migrated from it (`server/aggregate.py`).
+- Storage: `~/.local/share/opencode/opencode.db` (SQLite, WAL mode, can be 300MB+). **Always use the `opencode db` wrapper — never open the file directly** while opencode runs (WAL/locking).
+- Reference logic: `~/Downloads/export_token_usage.py` (per-message aggregation + parent/child session tree); the server's SQL was migrated from it (`server/aggregate.py`).
 
 ### Verified schema (opencode 1.18.10)
 
-- `project(id, worktree, name, time_created, ...)` — display name = `basename(worktree)`.
-- `session(id, project_id, parent_id, title, version, time_created, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write, metadata, ...)` — has denormalized per-session token/cost columns (recent addition); good for session-level rollups.
-- `message(id, session_id, time_created, data)` — `data` is JSON. Per-message granularity (needed when a session switches models mid-conversation):
-  - `data.role == 'assistant'`, `data.modelID`, `data.providerID`, `data.mode`
-  - `data.tokens = {input, output, reasoning, cache:{read, write}}`, `data.cost`
-- `session.parent_id` links subagent/fork sessions → build the session tree; roots have `parent_id IS NULL`.
+- `project(id, worktree, name, ...)` — display name = `basename(worktree)`.
+- `session(id, project_id, parent_id, title, time_created, agent, model, cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read, tokens_cache_write, ...)` — denormalized per-session token/cost columns (recent addition); good for session-level rollups.
+- `message(id, session_id, time_created, data)` — `data` is JSON, per-message granularity (needed when a session switches models mid-conversation): `data.role=='assistant'`, `data.modelID`, `data.providerID`, `data.mode`; `data.tokens={input,output,reasoning,cache:{read,write}}`, `data.cost`.
+- `session.parent_id` builds the subagent/fork tree; roots have `parent_id IS NULL`. `mainSessionCount` (in `/overview` + `/projects`) = roots *or* orphans (parent_id NULL **or** pointing at a session not in the DB) — `aggregate.py:46-48`.
 
 ### Gotchas
 
-- Token/cost values can legitimately be `0` (e.g. some models report nothing) — don't treat zeros as data errors.
-- `message` grows to tens of thousands of rows; aggregate in SQL with `json_extract(data,'$....')` and use `--format tsv` for big pulls (JSON output blows up, per the reference script).
-- Sessions accumulate across all projects in one DB; filter by `project_id` or the parent tree.
+- Token/cost values can legitimately be `0` (some models report nothing) — not data errors.
+- `message` grows to tens of thousands of rows; aggregate in SQL with `json_extract(data,'$....')`; use `--format tsv` for big pulls (JSON output blows up).
+- Directory-grouped ("global" worktree `/`) sessions use ids `'dir:' + lower(hex(directory))` so ids are URL-safe — raw paths would break `/projects/{id}` routes (`aggregate.py:32-36`).
 
-## Architecture decision
+## Architecture (settled)
 
-Both designs were verified hands-on (opencode 1.18.10; local `opencode serve` + curl). Both are feasible — the tradeoff is stability vs. build effort. **Decision is still OPEN.**
+思路一 (own aggregator over `opencode db`) was chosen; 思路二 (opencode `serve` API) was rejected because full-history enumeration rides undocumented routes (`/api/session`, `/experimental/session`) that break on upgrades.
 
-- **思路二 (serve API only)** — VERIFIED FEASIBLE. Serve exposes everything the dashboard needs, but half of it rides undocumented routes:
-  - Documented: `GET /session` (**current project only** — cannot be switched read-only), `GET /session/:id/message` (per-message `tokens`+`cost`+`modelID`/`providerID`/`mode` — covers mid-conversation model switches), `GET /session/:id/children`, `GET /event` SSE (events carry full Message/step token payloads → live counting without polling), `GET /project`. Requires HTTP Basic auth (`OPENCODE_SERVER_PASSWORD`; `--cors <origin>` for browser clients).
-  - **Fragility**: full-history enumeration across projects needs **undocumented** routes — `GET /api/session?limit=500` (cursor-paginated, inline session `tokens`/`cost`/`parentID`) or `GET /experimental/session?limit=500` (plain list, `project` joined). Both are internal; an opencode upgrade can silently break them → pin the opencode version, wrap both behind one adapter, re-verify against `/doc` after upgrades.
-  - N+1: per-model breakdown = one `GET /session/:id/message` per session; full scan ≈ 19s/86MB at ~192 sessions → do it **lazily** per drill-down (only ~4% of sessions switch models mid-conversation).
-  - Escape hatch: if enumeration regresses, one `opencode db` call for the session list alone covers the gap (serve API handles the rest).
-- **思路一 (own aggregator over `opencode db`)** — VERIFIED FEASIBLE, more code but a stable surface. Thin FastAPI server per opencode host shells out to `opencode db "<SQL>"` (WAL-safe; ~0.4s/query spawn cost), aggregates in SQL + Python, pushes SSE. Full aggregation ≈ 0.5s at current scale.
+- **Per-host backend** = FastAPI aggregator (`server/`). Reads storage via `opencode db`, exposes `API.md` endpoints + SSE `/stream`.
+- **Front-end server = single entry point.** The browser only talks to the front-end server (never real backends — they may be unreachable from the client's network). It proxies `/api/s/{i}/*` → the i-th configured backend and exposes `GET /api/config` (servers + ui options), which the SPA fetches at startup — **no backend URLs are ever bundled into the browser**.
+- Both `server.ts`/CLI serve and the Vite dev server share the same `/api/s/{i}` route scheme, so dev↔prod switching is transparent.
 
-If 思路二 is chosen, the per-host "server" shrinks to a thin proxy/aggregator for auth + CORS (or none if the client is non-browser); if 思路一, build the server per the layout below.
+## CLI & configuration (XDG — never edit installed package files)
+
+Installed packages are configured via interactive `configure`, writing to the **shared XDG dir** `~/.config/opencode-dashboard/` — front-end `config.yaml`, back-end `server.yaml`. There is deliberately **no in-package config file**; do not edit files inside `node_modules`/venv to configure.
+
+- Front-end `opencode-dashboard`: `configure` (interactive wizard) + `serve [--port] [--host]`. Config precedence: `DASHBOARD_CONFIG` env > repo `client/dashboard.yaml` (dev only, not shipped) > XDG `config.yaml` > defaults (port 5173, host 0.0.0.0, sessionPage 30).
+- Back-end `opencode-dashboard-server`: `configure` + `serve [--port] [--host] [--config PATH]`. Precedence: `--config` > XDG `server.yaml` > env > defaults. Env switches: `DASHBOARD_CORS_ORIGINS` (comma-separated, default = loopback whitelist), `DASHBOARD_POLL_SECONDS` (default 5), `OPENCODE_BIN`, `PORT`, `HOST`.
+- `configure` must work from a **piped stdin** (EOF → use default), not just interactive TTY.
 
 ## Layout & stack
 
-- `API.md` — the shared server↔client contract (endpoints, JSON shapes, SSE). Both sides implement exactly this; change it first, then both sides.
-- `server/` — Python 3.10+, `uv`, FastAPI, `pytest`. 思路一 aggregator: reads opencode storage via `opencode db` (never the file directly), exposes the `API.md` endpoints + SSE stream. `app.py:create_app(runner)` takes a runner so tests inject an in-memory SQLite fixture (`SqliteRunner`) while production shells out (`CliRunner`). CORS is wide-open (local tool). Run: `uv run uvicorn app:app --reload` (default port 8791).
-- `client/` — Node ≥22, `bun`, TypeScript, Vite (vanilla TS, no UI/chart libs). Configuration lives in `dashboard.yaml` (servers, front-end server host/port, ui options) — never hardcode addresses/ports in code. Run: `bun install`, `bun run dev` (vite), `bun run build` (typecheck + bundle). `bun mock-server.ts` serves canned `API.md` JSON for frontend-only work.
-- **Front-end server = single entry point.** The browser never reaches real backends directly (they may be unreachable from the client's network). It only talks to the front-end server, which proxies `/api/s/{i}/*` → the configured servers and exposes `GET /api/config` (resolved servers + ui options, fetched by the SPA at startup). Dev uses the Vite dev server (`vite.config.ts` generates the proxy + `/api/config` from the repo `dashboard.yaml`); prod uses the CLI `opencode-dashboard serve` (node, serves `dist/` + same routes; config from XDG `~/.config/opencode-dashboard/config.yaml` written by `configure`; env overrides `DASHBOARD_CONFIG`, `PORT`, `HOST`). Both share the same route scheme, so switching is transparent. (Client src uses relative `/api/s/{i}` paths — no backend URLs in the browser.)
-- Backend env switches: `DASHBOARD_CORS_ORIGINS` (CORS allow-list, default loopback dev origins), `DASHBOARD_POLL_SECONDS` (SSE poll, default 5), `OPENCODE_BIN` (opencode CLI path).
-- Run `pytest` inside `server/` (uv-managed); `bun run` scripts inside `client/`.
+- `API.md` — the server↔client contract (endpoints, JSON shapes camelCase, epoch-ms timestamps, SSE format). Change it first, then both sides.
+- `server/` — Python ≥3.10, `uv`, FastAPI, `pytest`. `app.py:create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=None)` — tests inject an in-memory SQLite fixture (`SqliteRunner`) while prod shells out (`CliRunner`); every param resolves explicit > env > default. `cli.py` is the console-script entry. Dev run: `uv run uvicorn app:app --reload` (port 8791).
+- `client/` — Node ≥22, `bun`, TypeScript, Vite (vanilla TS, no UI/chart libs). `cli.ts` is pure Node, bundled to `dist-cli/cli.mjs` (bun build, node shebang) — **the CLI runs on node, not bun**. Repo `dashboard.yaml` is dev-only (vite dev proxy + `/api/config` via `vite.config.ts`). Build order: `tsc && tsc -p tsconfig.node.json && vite build && bun build cli.ts --target=node`.
+- Vite proxy keys are **regex** (`^/api/s/${i}(?=/|$)`) — string prefixes let `/api/s/1` swallow `/api/s/10` (`vite.config.ts`).
+
+## Publishing & CI
+
+- Tag `v*` → GitHub Actions `publish.yml`: npm (`opencode-dashboard-client`) + PyPI (`opencode-dashboard-server`) + GitHub Release (wheel/sdist/client-dist.zip). Secrets: `NPM_TOKEN`, `PYPI_API_TOKEN` (set via `gh secret set`).
+- `ci.yml` runs on push/PR: server `uv sync && uv run pytest -q && uvx ruff check .`; client `bun install --frozen-lockfile && bun run build`.
+- Release flow: bump version in **both** `client/package.json` and `server/pyproject.toml` (must equal the tag); **then `cd server && uv lock`** — `uv.lock` records the project version and a stale lock fails `uv build` in CI. Commit → `git tag vX.Y.Z && git push origin vX.Y.Z` → verify the run (`gh run watch`) and refresh the release notes.
+- Packages keep registry metadata in code: `package.json` `homepage`/`repository`/`bugs`; `pyproject.toml` `[project.urls]` + `[project.scripts]`.
 
 ## Workflow
 
-- Before touching aggregation logic, re-verify schema with `opencode db` — table columns change across opencode versions.
-- Keep the server's SQL close to the reference script's proven queries; write `assert`-based checks or small `pytest` tests for aggregation against a seeded fixture DB (in-memory SQLite replicating the schema above).
+- Verify commands before claiming success: server = `uv run pytest -q` + `uvx ruff check .`; client = `bun run build` (tsc + node tsc + vite + cli bundle).
+- Before touching aggregation logic, re-verify the schema with `opencode db` — table columns change across opencode versions. Keep SQL close to the reference script's proven queries; test aggregation against the seeded in-memory fixture (`server/tests/conftest.py`).
+- Local macOS deployment uses LaunchAgents (`~/Library/LaunchAgents/com.opencode-dashboard*.plist`, user-level, `KeepAlive`). If you change serve behavior, the plists just call `... serve` — restart via `launchctl kickstart -k gui/$(id -u)/com.opencode-dashboard`.
