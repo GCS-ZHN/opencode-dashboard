@@ -16,6 +16,8 @@ opencode stores every session and message (with per-message token counts and cos
 It targets users who run opencode on several machines and want one page to watch all of them.
 
 ## Architecture
+![dashboard overall](docs/image.png)
+![dashboard detail](docs/image1.png)
 
 ```mermaid
 flowchart LR
