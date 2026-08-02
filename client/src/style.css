@@ -54,7 +54,7 @@ body {
   letter-spacing: 0.01em;
 }
 
-.app-head .mcp {
+.app-head .mcp-box {
   flex: none;
 }
 
@@ -200,26 +200,46 @@ body {
   animation: pulse 2s infinite;
 }
 
-.mcp {
-  font-size: 12px;
-  color: var(--muted);
-  text-decoration: none;
+.mcp-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 0 7px;
+  padding: 2px 8px;
+  background: none;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
   user-select: none;
-  transition: color 120ms, border-color 120ms;
+  transition: border-color 120ms;
 }
 
-.mcp:hover {
-  color: var(--text);
+.mcp-box:hover {
   border-color: var(--accent);
 }
 
-.mcp.copied {
-  color: var(--live);
+.mcp-box.copied {
   border-color: var(--live);
+}
+
+.mcp-url {
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--muted);
+  user-select: all;
+  white-space: nowrap;
+}
+
+.mcp-copy {
+  font-size: 11px;
+  color: var(--text);
+  border-left: 1px solid var(--border);
+  padding-left: 6px;
+}
+
+.mcp-box.copied .mcp-copy {
+  color: var(--live);
 }
 
 @media (prefers-reduced-motion: reduce) {

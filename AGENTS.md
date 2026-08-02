@@ -34,6 +34,31 @@ opencode db "<SQL>" --format json   # or --format tsv for big pulls
 - **Front-end server = single entry point.** The browser only talks to the front-end server (never real backends — they may be unreachable from the client's network). It proxies `/api/s/{i}/*` → the i-th configured backend and exposes `GET /api/config` (servers + ui options), which the SPA fetches at startup — **no backend URLs are ever bundled into the browser**.
 - Both `server.ts`/CLI serve and the Vite dev server share the same `/api/s/{i}` route scheme, so dev↔prod switching is transparent.
 
+## MCP server (on the front-end server, at `/mcp`)
+
+- `client/mcp.ts` exposes a **read-only MCP server on the same process as the front-end server** (`cli.ts` `serve`), reachable at `/mcp` and `/mcp/` (both work; `/mcp/<sub>` also routes there). Uses `@modelcontextprotocol/sdk@^1.30.0` `StreamableHTTPServerTransport`.
+- Tools: `list_servers`, `overview`, `projects`, `project_detail`, `session_detail` — each takes a `server` index and GETs the backend exactly like the `/api/s/{i}` proxy. **MCP clients never talk to real backends directly** (same trust boundary as the SPA).
+- Per-request lifecycle is SDK-mandated: the SDK throws on reusing a stateless transport, so each request gets a fresh `Server` + transport. Version string is imported from `package.json` (`pkg.version`) — keep it in sync with the release bump.
+- SPA shows the endpoint URL + copy in the app header (`#mcp-box`), built from `location.origin` — **never a hardcoded host/port**.
+- Vite dev parity: `vite.config.ts` mounts `/mcp` via connect middleware, but **the dev-server MCP handshake is unreliable with opencode's client** (seen: `SSE error: Unable to connect`). For real opencode integration testing, run the **prod CLI serve** (`node dist-cli/cli.mjs serve`) — that's the supported path.
+
+### Verifying the MCP server with `opencode run` (manual smoke test)
+
+1. Start the front-end server in prod mode with the backend configured: `cd client && bun run build && node dist-cli/cli.mjs serve --port 5180` (or `DASHBOARD_CONFIG=<yaml>` for a custom backend set).
+2. Add a **project-level** MCP entry pointing at it (config file location per opencode docs; remove after testing — never commit a test-only MCP pointing at a running dev server):
+   ```jsonc
+   // .opencode/config.jsonc
+   { "mcp": { "opencode-dashboard": { "type": "remote", "url": "http://127.0.0.1:5180/mcp" } } }
+   ```
+   Load it explicitly: `OPENCODE_CONFIG=.opencode/config.jsonc opencode mcp list` → expect `✓ connected`.
+3. Run a tool-calling prompt (note the model needs its provider prefix, e.g. `deepseek/deepseek-v4-flash`):
+   ```bash
+   OPENCODE_CONFIG=.opencode/config.jsonc opencode run \
+     "使用 opencode-dashboard 的 MCP 工具: overview(server 0) + projects(server 0), 报告数字" \
+     --model deepseek/deepseek-v4-flash
+   ```
+   Expect `opencode-dashboard_overview` / `opencode-dashboard_projects` to fire and return real numbers.
+
 ## CLI & configuration (XDG — never edit installed package files)
 
 Installed packages are configured via interactive `configure`, writing to the **shared XDG dir** `~/.config/opencode-dashboard/` — front-end `config.yaml`, back-end `server.yaml`. There is deliberately **no in-package config file**; do not edit files inside `node_modules`/venv to configure.
@@ -46,8 +71,8 @@ Installed packages are configured via interactive `configure`, writing to the **
 
 - `API.md` — the server↔client contract (endpoints, JSON shapes camelCase, epoch-ms timestamps, SSE format). Change it first, then both sides.
 - `server/` — Python ≥3.10, `uv`, FastAPI, `pytest`. `app.py:create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=None)` — tests inject an in-memory SQLite fixture (`SqliteRunner`) while prod shells out (`CliRunner`); every param resolves explicit > env > default. `cli.py` is the console-script entry. Dev run: `uv run uvicorn app:app --reload` (port 8791).
-- `client/` — Node ≥22, `bun`, TypeScript, Vite (vanilla TS, no UI/chart libs). `cli.ts` is pure Node, bundled to `dist-cli/cli.mjs` (bun build, node shebang) — **the CLI runs on node, not bun**. Repo `dashboard.yaml` is dev-only (vite dev proxy + `/api/config` via `vite.config.ts`). Build order: `tsc && tsc -p tsconfig.node.json && vite build && bun build cli.ts --target=node`.
-- Vite proxy keys are **regex** (`^/api/s/${i}(?=/|$)`) — string prefixes let `/api/s/1` swallow `/api/s/10` (`vite.config.ts`).
+- `client/` — Node ≥22, `bun`, TypeScript, Vite (vanilla TS, no UI/chart libs). `cli.ts` is pure Node, bundled to `dist-cli/cli.mjs` (bun build, node shebang) — **the CLI runs on node, not bun**. Repo `dashboard.yaml` is dev-only (vite dev proxy + `/api/config` via `vite.config.ts`). Build order: `tsc && tsc -p tsconfig.node.json && vite build && bun build cli.ts --target=node`. Client tests: `bun test mcp.test.mjs export.test.ts` (Node ≥22 `node:test`, no framework; test files live at `client/*.test.*`, outside `src/` so the app tsconfig doesn't typecheck them).
+- Vite proxy keys are **regex** (`^/api/s/${i}(?=/|$)`) — string prefixes let `/api/s/1` swallow `/api/s/10` (`vite.config.ts`). `xlsx` is a **devDependency** (build-time only; the browser code lazy-imports it via `await import("xlsx")` so it loads as a separate chunk only on export).
 
 ## Publishing & CI
 

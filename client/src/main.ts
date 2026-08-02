@@ -433,8 +433,9 @@ function stat(label: string, value: string): HTMLElement {
   return s;
 }
 
-/** Copy the MCP endpoint URL (current origin + /mcp) to the clipboard. */
-async function copyMcpUrl(link: HTMLElement): Promise<void> {
+/** Copy the MCP endpoint URL (current origin + /mcp) to the clipboard. The box
+ * is one click target: it gets `.copied` and its internal label swaps to "copied". */
+async function copyMcpUrl(box: HTMLElement): Promise<void> {
   const text = `${location.origin}/mcp`;
   try {
     if (navigator.clipboard && window.isSecureContext) {
@@ -453,26 +454,26 @@ async function copyMcpUrl(link: HTMLElement): Promise<void> {
     document.execCommand("copy");
     ta.remove();
   }
-  const wasCopied = link.classList.contains("copied");
-  const label = wasCopied ? "mcp" : link.textContent;
-  link.textContent = "copied";
-  link.classList.add("copied");
+  const label = box.querySelector(".mcp-copy");
+  if (!label) return;
+  const wasCopied = box.classList.contains("copied");
+  const prev = wasCopied ? "copy" : label.textContent;
+  label.textContent = "copied";
+  box.classList.add("copied");
   setTimeout(() => {
-    link.textContent = label;
-    link.classList.remove("copied");
+    label.textContent = prev;
+    box.classList.remove("copied");
   }, 1200);
 }
 
-/** Wire the global MCP link in the app header (one per dashboard, not per server). */
+/** Wire the global MCP box in the app header: the whole box (URL + copy) is one
+ * click target that copies the endpoint URL (one per dashboard, not per server). */
 function bindMcpLink(): void {
-  const a = document.getElementById("mcp-link") as HTMLAnchorElement | null;
-  if (!a) return;
-  a.href = `${location.origin}/mcp`;
-  a.title = "Copy MCP endpoint URL";
-  a.addEventListener("click", (e) => {
-    e.preventDefault();
-    void copyMcpUrl(a);
-  });
+  const urlEl = document.getElementById("mcp-url");
+  const box = document.getElementById("mcp-box");
+  if (!urlEl || !box) return;
+  urlEl.textContent = `${location.origin}/mcp`;
+  box.addEventListener("click", () => void copyMcpUrl(box));
 }
 
 /** "3 / 6" = main sessions (roots) / total sessions (incl. subagents). */
