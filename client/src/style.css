@@ -67,6 +67,41 @@ body {
   flex: none;
 }
 
+.range-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.range-bar select,
+.range-bar input[type="date"] {
+  background: var(--inset);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
+.range-custom {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.range-custom input[type="date"] {
+  color-scheme: dark;
+}
+
+@media (max-width: 760px) {
+  .range-bar {
+    flex-wrap: wrap;
+  }
+}
+
 .legend {
   display: flex;
   gap: 14px;

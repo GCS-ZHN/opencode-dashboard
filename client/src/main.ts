@@ -7,15 +7,19 @@ import type {
   ServerOverview,
   Session,
   SessionDetailResponse,
+  TimeRange,
   Tokens,
   UpdateEvent,
 } from "./api";
 import { el, fmtAgo, fmtCost, fmtTokens, spinner, tokenCell } from "./render";
 import { exportServers, type ExportTarget } from "./export";
+import { computeRange } from "./range";
 
 let SESSION_PAGE = 30;
 let SERVERS: ServerConfig[] = [];
 let panels: ServerPanel[] = [];
+/** Active time window threaded through every API call (undefined = all time). */
+let RANGE: TimeRange | undefined;
 const ACCENTS = ["#58a6ff", "#3fb950", "#a371f7", "#d29922", "#f85149", "#39c5cf", "#db61a2", "#79c0ff"];
 
 function parseEvent(e: MessageEvent): UpdateEvent | null {
@@ -60,6 +64,8 @@ class ServerPanel {
   private expandedSessions = new Set<string>();
   private sessionLimits = new Map<string, number>();
   private error: string | null = null;
+  /** Bumped on every reload(); stale fetches check this before writing state. */
+  private gen = 0;
   private es: EventSource | null = null;
   private liveRef: HTMLSpanElement | null = null;
   private updRef: HTMLSpanElement | null = null;
@@ -103,29 +109,47 @@ class ServerPanel {
   }
 
   private async refresh(): Promise<void> {
+    const g = this.gen;
     try {
       const [ov, projects, models] = await Promise.all([
-        api.overview(this.idx),
-        api.projects(this.idx),
-        api.models(this.idx).catch((e) =>
+        api.overview(this.idx, RANGE),
+        api.projects(this.idx, RANGE),
+        api.models(this.idx, RANGE).catch((e) =>
           /\b404\b/.test(e instanceof Error ? e.message : String(e)) ? null : Promise.reject(e),
         ),
       ]);
+      if (g !== this.gen) return;
       this.overview = ov;
       this.projects = projects;
       this.models = models ?? [];
       this.error = null;
     } catch (e) {
+      if (g !== this.gen) return;
       this.error = e instanceof Error ? e.message : String(e);
     }
     this.render();
   }
 
+  /** Re-fetch everything for a new range: drop cached drill-down, reload expanded. */
+  reload(): Promise<void> {
+    ++this.gen;
+    this.projectDetails.clear();
+    this.sessionDetails.clear();
+    const tasks: Promise<void>[] = [this.refresh()];
+    for (const id of this.expandedProjects) tasks.push(this.loadProject(id));
+    for (const id of this.expandedSessions) tasks.push(this.loadSession(id));
+    return Promise.all(tasks).then(() => {});
+  }
+
   private async loadProject(id: string): Promise<void> {
     if (!this.expandedProjects.has(id)) return;
+    const g = this.gen;
     try {
-      this.projectDetails.set(id, await api.project(this.idx, id));
+      const d = await api.project(this.idx, id, RANGE);
+      if (g !== this.gen) return;
+      this.projectDetails.set(id, d);
     } catch {
+      if (g !== this.gen) return;
       this.expandedProjects.delete(id);
     }
     this.render();
@@ -133,9 +157,13 @@ class ServerPanel {
 
   private async loadSession(id: string): Promise<void> {
     if (!this.expandedSessions.has(id)) return;
+    const g = this.gen;
     try {
-      this.sessionDetails.set(id, await api.session(this.idx, id));
+      const d = await api.session(this.idx, id, RANGE);
+      if (g !== this.gen) return;
+      this.sessionDetails.set(id, d);
     } catch {
+      if (g !== this.gen) return;
       this.expandedSessions.delete(id);
     }
     this.render();
@@ -220,7 +248,9 @@ class ServerPanel {
     }
 
     if (this.projects.length === 0) {
-      this.root.appendChild(el("div", "empty", "No projects found on this host."));
+      this.root.appendChild(
+        el("div", "empty", RANGE ? "No data in the selected range." : "No projects found on this host."),
+      );
       return;
     }
 
@@ -578,8 +608,26 @@ function pieCard(title: string, entries: { label: string; value: number }[], fmt
 
 const app = document.getElementById("app")!;
 
+/** Global time-range control: re-fetch every panel when it changes. */
+function bindRange(): void {
+  const sel = document.getElementById("range-select") as HTMLSelectElement | null;
+  const custom = document.getElementById("range-custom") as HTMLElement | null;
+  const apply = () => {
+    const sinceVal = (document.getElementById("range-since") as HTMLInputElement | null)?.value;
+    const untilVal = (document.getElementById("range-until") as HTMLInputElement | null)?.value;
+    RANGE = computeRange(sel?.value ?? "all", Date.now(), sinceVal, untilVal) ?? undefined;
+    if (custom) custom.hidden = sel?.value !== "custom";
+    void Promise.all(panels.map((p) => p.reload()));
+  };
+  sel?.addEventListener("change", apply);
+  for (const id of ["range-since", "range-until"]) {
+    document.getElementById(id)?.addEventListener("change", apply);
+  }
+}
+
 async function boot(): Promise<void> {
   bindMcpLink();
+  bindRange();
   const bootLoading = spinner("Loading dashboard…");
   bootLoading.classList.add("page-loading");
   app.replaceChildren(bootLoading);
@@ -660,7 +708,7 @@ async function boot(): Promise<void> {
     const label = exportBtn.textContent ?? "";
     exportBtn.textContent = "Exporting…";
     try {
-      await exportServers(targets);
+      await exportServers(targets, RANGE);
     } catch (e) {
       alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

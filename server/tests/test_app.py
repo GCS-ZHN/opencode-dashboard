@@ -68,3 +68,24 @@ def test_cors_origins_injection():
     assert ok.headers.get("access-control-allow-origin") == "http://a.com"
     nope = c.options("/projects", headers={"Origin": "http://a.co", "Access-Control-Request-Method": "GET"})
     assert "access-control-allow-origin" not in nope.headers
+
+
+def test_since_until_pass_through():
+    c, _ = make_client()
+    r = c.get("/projects", params={"since": 140000})
+    assert r.status_code == 200
+    assert [p["id"] for p in r.json()] == ["proj-ccc", "proj-bbb", "dir:2f55736572732f746573742f70726f6a656374732f6f70656e636f64652d64617368626f617264"]
+    r = c.get("/overview", params={"since": 140000, "until": 150000})
+    assert r.status_code == 200
+    assert r.json()["sessionCount"] == 1  # only s4
+    r = c.get("/sessions/s4", params={"until": 143500})
+    assert r.status_code == 200
+    assert [m["model"] for m in r.json()["models"]] == ["deepseek-v4-flash", "claude-sonnet-4.5"]
+    # session outside the window 404s
+    r = c.get("/sessions/s4", params={"since": 150000})
+    assert r.status_code == 404
+
+
+def test_non_integer_since_is_422():
+    c, _ = make_client()
+    assert c.get("/overview", params={"since": "abc"}).status_code == 422

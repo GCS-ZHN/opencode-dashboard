@@ -16,6 +16,20 @@
           <span class="mcp-copy">copy</span>
         </button>
       </div>
+      <div class="range-bar">
+        <label for="range-select">Range</label>
+        <select id="range-select" title="Restrict all levels to a date window">
+          <option value="all" selected>All time</option>
+          <option value="today">Today</option>
+          <option value="7d">Last 7 days</option>
+          <option value="custom">Custom…</option>
+        </select>
+        <div class="range-custom" id="range-custom" hidden>
+          <input type="date" id="range-since" aria-label="from" />
+          <span>→</span>
+          <input type="date" id="range-until" aria-label="until" />
+        </div>
+      </div>
       <div class="legend">
         <span><i class="dot seg-in"></i>input</span>
         <span><i class="dot seg-out"></i>output</span>

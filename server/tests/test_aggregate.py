@@ -149,3 +149,60 @@ def test_models_hostwide_rollup(runner):
     assert kimi["messageCount"] == 1  # only m4; the m5 user message is excluded
     assert kimi["tokens"] == ZERO_TOKENS
     assert kimi["cost"] == 0.0
+
+
+def test_overview_time_filter(runner):
+    o = overview(runner, since=140000)
+    assert o["sessionCount"] == 4  # s4, s5, s6, s8
+    assert o["mainSessionCount"] == 4
+    assert o["projectCount"] == 3
+    assert o["cost"] == 4.6
+    assert overview(runner, since=150000)["sessionCount"] == 3
+    assert overview(runner, until=150000)["sessionCount"] == 5  # s1..s4 + s7
+
+
+def test_overview_window_is_half_open(runner):
+    # s3.time_created == 115000 must NOT match until=115000
+    o = overview(runner, until=115000)
+    assert o["sessionCount"] == 2  # s1, s7
+    assert o["cost"] == 2.1
+
+
+def test_projects_time_filter(runner):
+    ps = projects(runner, since=140000)
+    assert [p["id"] for p in ps] == ["proj-ccc", "proj-bbb", DIR_DASH]
+    bbb = ps[1]
+    assert bbb["sessionCount"] == 2  # s4, s5
+    assert bbb["cost"] == 0.9
+
+
+def test_project_detail_time_filter(runner):
+    proj, sessions = project_detail(runner, "proj-aaa", since=115000)
+    assert proj["cost"] == 0.7  # s2 + s3 (s1 outside the window)
+    # s3 stays a subagent: its parent s1 is only outside the window, not the DB
+    assert proj["mainSessionCount"] == 1
+    assert [s["id"] for s in sessions] == ["s2", "s3"]  # cost desc
+    assert project_detail(runner, "proj-aaa", since=130000) is None
+
+
+def test_session_detail_time_filter(runner):
+    sess, ms = session_detail(runner, "s4", until=143500)
+    assert sess["id"] == "s4"  # s4.time_created (140000) < until
+    # m6 (144000) excluded; m1+m2 merge into the deepseek/build entry
+    assert [m["model"] for m in ms] == ["deepseek-v4-flash", "claude-sonnet-4.5"]
+    assert ms[0]["messageCount"] == 2
+    assert ms[0]["cost"] == 0.6
+    assert ms[1]["messageCount"] == 1
+    assert ms[1]["cost"] == 0.3
+    assert session_detail(runner, "s4", since=150000) is None  # session itself out of window
+
+
+def test_models_message_time_filter(runner):
+    ms = models(runner, since=143000)
+    assert [m["model"] for m in ms] == ["claude-sonnet-4.5", "deepseek-v4-flash", "kimi-k3"]
+    assert ms[0]["cost"] == 0.3
+    assert ms[1]["provider"] == "openrouter"  # m6 only; m1+m2 are before since
+    assert ms[1]["messageCount"] == 1
+    assert ms[1]["cost"] == 0.1
+    assert ms[2]["messageCount"] == 1  # m4 only
+    assert models(runner, since=152000) == []  # no token-bearing messages left

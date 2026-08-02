@@ -7,6 +7,15 @@ Shared contract between `server/` (FastAPI aggregator over `opencode db`) and `c
 - Base path: none (routes at root).
 - Time: epoch milliseconds (integer).
 - Ordering: descending by `cost` at every level (ties: by name/id).
+- Time-range filter (optional): every data endpoint accepts `since` / `until`
+  query params — epoch-ms integers, half-open `[since, until)` window. Omit
+  either side for an unbounded bound; omit both for all time (default).
+  Session-level rollups (`/overview`, `/projects`, `/projects/{id}`, the
+  `session` object of `/sessions/{id}`) filter on `session.time_created`;
+  per-model breakdowns (`/models`, the `models` array) filter on
+  `message.time_created`. Sessions/messages outside the window are excluded,
+  so project/overview counts reflect only in-window sessions and a session
+  outside the window 404s. Non-integer values → 422.
 - `tokens` object shape (identical everywhere):
   ```json
   "tokens": {"input": 0, "output": 0, "reasoning": 0, "cacheRead": 0, "cacheWrite": 0, "total": 0}

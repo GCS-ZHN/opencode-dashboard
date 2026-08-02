@@ -6,7 +6,7 @@
 // pinned CDN tarball (https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz).
 import { api } from "./api";
 import { el } from "./render";
-import type { Session, Tokens } from "./api";
+import type { Session, TimeRange, Tokens } from "./api";
 
 export interface ExportTarget {
   idx: number;
@@ -71,9 +71,9 @@ export function sheetName(name: string): string {
   return name.replace(/[\[\]:*?/\\]/g, "_").slice(0, 31);
 }
 
-async function serverRows(idx: number): Promise<Array<Array<string | number>>> {
-  const projects = await api.projects(idx);
-  const details = await Promise.all(projects.map((p) => api.project(idx, p.id)));
+async function serverRows(idx: number, range?: TimeRange): Promise<Array<Array<string | number>>> {
+  const projects = await api.projects(idx, range);
+  const details = await Promise.all(projects.map((p) => api.project(idx, p.id, range)));
   const rows: Array<Array<string | number>> = [HEADERS];
   for (const d of details) {
     const sessions = d.sessions.slice().sort((a, b) => a.timeCreated - b.timeCreated);
@@ -89,12 +89,12 @@ async function serverRows(idx: number): Promise<Array<Array<string | number>>> {
  * is one `api.session` fetch per session (N+1 fan-out) for little added value
  * at large session counts.
  */
-export async function exportServers(targets: ExportTarget[]): Promise<void> {
+export async function exportServers(targets: ExportTarget[], range?: TimeRange): Promise<void> {
   const XLSX = await import("xlsx"); // lazy chunk; ~800KB only loaded on export
   const wb = XLSX.utils.book_new();
   const used = new Set<string>();
   for (const t of targets) {
-    const rows = await serverRows(t.idx);
+    const rows = await serverRows(t.idx, range);
     let name = sheetName(t.name);
     // Duplicate sheet names throw in book_append_sheet and kill the whole
     // workbook; dedupe with a " (n)" suffix when sanitization collides.

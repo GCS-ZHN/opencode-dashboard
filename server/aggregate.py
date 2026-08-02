@@ -38,7 +38,9 @@ CASE WHEN p.worktree IS NOT NULL AND p.worktree != '/' THEN s.project_id
 
 # Join + effective-key mapping live in a derived table so `id`/`worktree` are
 # unambiguous result columns (s.id and p.id would otherwise clash in GROUP BY).
-ROLLUP_SQL = f"""
+# `{time_filter}` ("" or a WHERE on s.time_created) is filled in per request for
+# the since/until window.
+ROLLUP_SQL = """
 SELECT gid AS id,
        MAX(worktree) AS worktree,
        COUNT(*) AS session_count,
@@ -57,11 +59,12 @@ FROM (
     SELECT s.project_id, s.id AS sid, s.parent_id, s.cost, s.tokens_input,
            s.tokens_output, s.tokens_reasoning, s.tokens_cache_read,
            s.tokens_cache_write,
-           {EFF_SQL} AS gid,
+           {eff_sql} AS gid,
            CASE WHEN p.worktree IS NOT NULL AND p.worktree != '/' THEN p.worktree
                 ELSE s.directory END AS worktree
     FROM session s
     LEFT JOIN project p ON p.id = s.project_id
+    {time_filter}
 ) AS eff
 """
 
@@ -72,13 +75,13 @@ SELECT id, parent_id, project_id, title, agent, model, cost,
 FROM session
 """
 
-PROJECT_SESSIONS_SQL = f"""
+PROJECT_SESSIONS_SQL = """
 SELECT s.id, s.parent_id, s.project_id, s.title, s.agent, s.model, s.cost,
        s.tokens_input, s.tokens_output, s.tokens_reasoning, s.tokens_cache_read,
        s.tokens_cache_write, s.time_created, s.time_updated
 FROM session s
 LEFT JOIN project p ON p.id = s.project_id
-WHERE {EFF_SQL} = ?
+WHERE {eff_sql} = ?{time_filter}
 ORDER BY s.cost DESC, s.id ASC
 """
 
@@ -97,6 +100,29 @@ FROM message
 WHERE json_extract(data, '$.role') = 'assistant'
   AND json_extract(data, '$.tokens') IS NOT NULL
 """
+
+
+def _time_fragment(col: str, since, until) -> tuple[str, tuple]:
+    """Half-open [since, until) filter on `col`. Fragment starts with ' AND '
+    so it appends after an existing WHERE; callers with no WHERE strip it.
+    Returns ("", ()) when neither bound is given."""
+    conds, params = [], []
+    if since is not None:
+        conds.append(f"{col} >= ?")
+        params.append(since)
+    if until is not None:
+        conds.append(f"{col} < ?")
+        params.append(until)
+    if not conds:
+        return "", ()
+    return " AND " + " AND ".join(conds), tuple(params)
+
+
+def _rollup(since=None, until=None) -> tuple[str, tuple]:
+    tf, tp = _time_fragment("s.time_created", since, until)
+    if tf:
+        tf = "WHERE " + tf[5:]
+    return ROLLUP_SQL.format(eff_sql=EFF_SQL, time_filter=tf), tp
 
 
 def normalize_model(mid) -> str | None:
@@ -174,8 +200,9 @@ def updated_at(runner) -> int:
     return int(row["m"] or 0)
 
 
-def overview(runner) -> dict:
-    r = runner.query(ROLLUP_SQL)[0]
+def overview(runner, since=None, until=None) -> dict:
+    sql, tp = _rollup(since, until)
+    r = runner.query(sql, tp)[0]
     return {
         "projectCount": int(r["project_count"] or 0),
         "sessionCount": int(r["session_count"] or 0),
@@ -186,22 +213,29 @@ def overview(runner) -> dict:
     }
 
 
-def projects(runner) -> list[dict]:
+def projects(runner, since=None, until=None) -> list[dict]:
+    sql, tp = _rollup(since, until)
     rows = runner.query(
-        ROLLUP_SQL + " GROUP BY id, worktree"
-        " ORDER BY cost DESC, id ASC"
+        sql + " GROUP BY id, worktree"
+        " ORDER BY cost DESC, id ASC",
+        tp,
     )
     return [_project(r) for r in rows]
 
 
-def project_detail(runner, project_id) -> tuple[dict, list[dict]] | None:
+def project_detail(runner, project_id, since=None, until=None) -> tuple[dict, list[dict]] | None:
+    sql, tp = _rollup(since, until)
     rows = runner.query(
-        ROLLUP_SQL + " GROUP BY id, worktree HAVING id = ?",
-        (project_id,),
+        sql + " GROUP BY id, worktree HAVING id = ?",
+        tp + (project_id,),
     )
     if not rows:
         return None
-    sessions = runner.query(PROJECT_SESSIONS_SQL, (project_id,))
+    tf, tps = _time_fragment("s.time_created", since, until)
+    sessions = runner.query(
+        PROJECT_SESSIONS_SQL.format(eff_sql=EFF_SQL, time_filter=tf),
+        (project_id,) + tps,
+    )
     return _project(rows[0]), [_session(r) for r in sessions]
 
 
@@ -216,20 +250,22 @@ def _model_entry(d: dict) -> dict:
     }
 
 
-def session_detail(runner, session_id) -> tuple[dict, list[dict]] | None:
-    rows = runner.query(SESSIONS_SQL + " WHERE id = ?", (session_id,))
+def session_detail(runner, session_id, since=None, until=None) -> tuple[dict, list[dict]] | None:
+    tf, tp = _time_fragment("time_created", since, until)
+    rows = runner.query(SESSIONS_SQL + " WHERE id = ?" + tf, (session_id,) + tp)
     if not rows:
         return None
+    mf, mp = _time_fragment("message.time_created", since, until)
     msg_rows = runner.query_tsv(
-        MESSAGES_SQL + " AND session_id = ? GROUP BY model_id, provider, mode",
-        (session_id,),
+        MESSAGES_SQL + " AND session_id = ?" + mf + " GROUP BY model_id, provider, mode",
+        (session_id,) + mp,
     )
     models = [_model_entry(dict(zip(_MSG_KEYS, row))) for row in msg_rows]
     models.sort(key=lambda m: (-m["cost"], m["model"] or ""))
     return _session(rows[0]), models
 
 
-def models(runner) -> list[dict]:
+def models(runner, since=None, until=None) -> list[dict]:
     """Whole-host per-model rollup from message.data (same shape as the
     per-session model breakdown, but aggregated across all sessions).
 
@@ -238,7 +274,10 @@ def models(runner) -> list[dict]:
     deepseek/deepseek-v4-flash vs deepseek-v4-flash) don't create duplicate
     slices. On merge, the higher-cost row keeps its provider/mode label.
     """
-    msg_rows = runner.query_tsv(MESSAGES_SQL + " GROUP BY model_id, provider, mode")
+    mf, mp = _time_fragment("message.time_created", since, until)
+    msg_rows = runner.query_tsv(
+        MESSAGES_SQL + mf + " GROUP BY model_id, provider, mode", mp
+    )
     merged: dict[str, dict] = {}
     for row in msg_rows:
         e = _model_entry(dict(zip(_MSG_KEYS, row)))
