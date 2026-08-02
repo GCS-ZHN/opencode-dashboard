@@ -105,6 +105,7 @@ export const api = {
   config: () => getJson<DashboardConfigResponse>("/", "api/config"),
   overview: (idx: number) => getJson<ServerOverview>(baseOf(idx), "/overview"),
   projects: (idx: number) => getJson<Project[]>(baseOf(idx), "/projects"),
+  models: (idx: number) => getJson<ModelUsage[]>(baseOf(idx), "/models"),
   project: (idx: number, id: string) => getJson<ProjectDetail>(baseOf(idx), `/projects/${encodeURIComponent(id)}`),
   session: (idx: number, id: string) =>
     getJson<SessionDetailResponse>(baseOf(idx), `/sessions/${encodeURIComponent(id)}`),

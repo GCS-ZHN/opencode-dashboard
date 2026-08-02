@@ -205,6 +205,17 @@ def project_detail(runner, project_id) -> tuple[dict, list[dict]] | None:
     return _project(rows[0]), [_session(r) for r in sessions]
 
 
+def _model_entry(d: dict) -> dict:
+    return {
+        "model": normalize_model(d["model_id"]),
+        "provider": d["provider"],
+        "mode": d["mode"],
+        "messageCount": int(d["message_count"] or 0),
+        "tokens": tokens(d),
+        "cost": round(float(d["cost"] or 0), 6),
+    }
+
+
 def session_detail(runner, session_id) -> tuple[dict, list[dict]] | None:
     rows = runner.query(SESSIONS_SQL + " WHERE id = ?", (session_id,))
     if not rows:
@@ -213,16 +224,36 @@ def session_detail(runner, session_id) -> tuple[dict, list[dict]] | None:
         MESSAGES_SQL + " AND session_id = ? GROUP BY model_id, provider, mode",
         (session_id,),
     )
-    models = []
-    for row in msg_rows:
-        d = dict(zip(_MSG_KEYS, row))
-        models.append({
-            "model": normalize_model(d["model_id"]),
-            "provider": d["provider"],
-            "mode": d["mode"],
-            "messageCount": int(d["message_count"] or 0),
-            "tokens": tokens(d),
-            "cost": round(float(d["cost"] or 0), 6),
-        })
+    models = [_model_entry(dict(zip(_MSG_KEYS, row))) for row in msg_rows]
     models.sort(key=lambda m: (-m["cost"], m["model"] or ""))
     return _session(rows[0]), models
+
+
+def models(runner) -> list[dict]:
+    """Whole-host per-model rollup from message.data (same shape as the
+    per-session model breakdown, but aggregated across all sessions).
+
+    Rows are grouped by (model_id, provider, mode) so provider/mode labels are
+    accurate, then merged by display name so prefixed/unprefixed ids (e.g.
+    deepseek/deepseek-v4-flash vs deepseek-v4-flash) don't create duplicate
+    slices. On merge, the higher-cost row keeps its provider/mode label.
+    """
+    msg_rows = runner.query_tsv(MESSAGES_SQL + " GROUP BY model_id, provider, mode")
+    merged: dict[str, dict] = {}
+    for row in msg_rows:
+        e = _model_entry(dict(zip(_MSG_KEYS, row)))
+        key = e["model"] or ""
+        cur = merged.get(key)
+        if cur is None:
+            merged[key] = e
+        else:
+            if e["cost"] > cur["cost"]:
+                cur["provider"] = e["provider"]
+                cur["mode"] = e["mode"]
+            cur["messageCount"] += e["messageCount"]
+            for k in ("input", "output", "reasoning", "cacheRead", "cacheWrite", "total"):
+                cur["tokens"][k] += e["tokens"][k]
+            cur["cost"] = round(cur["cost"] + e["cost"], 6)
+    ms = list(merged.values())
+    ms.sort(key=lambda m: (-m["cost"], m["model"] or ""))
+    return ms

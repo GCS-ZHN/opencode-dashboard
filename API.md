@@ -57,6 +57,18 @@ Array of per-project rollups.
 ```
 `name` = basename of `worktree`. `sessionCount`/`mainSessionCount` as in `/overview`.
 
+### `GET /models`
+Whole-host per-model rollup (per-message aggregation across all sessions; covers mid-conversation model switches).
+```json
+[
+  {"model": "claude-sonnet-4-5", "provider": "anthropic", "mode": "build",
+   "messageCount": 29, "tokens": {...}, "cost": 5.21},
+  {"model": "deepseek-v4-flash", "provider": "deepseek", "mode": "build",
+   "messageCount": 17, "tokens": {...}, "cost": 0.013}
+]
+```
+Same entry shape as `models` in `/sessions/{sessionId}`, but aggregated host-wide. Rows are grouped by `(model_id, provider, mode)` then merged by display model name (so prefixed/unprefixed ids like `deepseek/deepseek-v4-flash` and `deepseek-v4-flash` don't duplicate; on merge the higher-cost row keeps its provider/mode label). `messageCount` = assistant messages contributing tokens for that model. Ordered by `cost` desc (ties by model name). Empty array if no assistant token-bearing messages.
+
 ### `GET /projects/{projectId}`
 Project detail + its full session list (flat, with `parentId`; client builds the tree; roots have `parentId: null`).
 ```json
@@ -112,6 +124,7 @@ Plus a heartbeat every 15s: `data: {"type":"heartbeat"}`. `scope` tells the clie
 - All data read via `opencode db "<SQL>" --format json|tsv` (never direct file open). Schema + gotchas in `AGENTS.md`.
 - Project/session rollups come from `session` table columns (`cost`, `tokens_input/output/reasoning/cache_read/cache_write`).
 - Per-model breakdown from `message.data` JSON (`role='assistant'`, `tokens` not null), grouped by `(session_id, model_id, provider_id, mode)`.
+- Host-wide `/models` aggregates the same rows grouped by `(model_id, provider, mode)`, then merges by display name.
 - 404 JSON for unknown project/session ids: `{"detail": "..."}` (FastAPI default).
 
 ## Error handling

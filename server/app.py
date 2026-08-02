@@ -89,6 +89,10 @@ def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=N
     def projects():
         return handle(lambda: aggregate.projects(runner))
 
+    @app.get("/models")
+    def models():
+        return handle(lambda: aggregate.models(runner))
+
     @app.get("/projects/{project_id}")
     def project(project_id: str):
         def run():

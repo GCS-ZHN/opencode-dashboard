@@ -10,12 +10,12 @@ import type {
   Tokens,
   UpdateEvent,
 } from "./api";
-import { el, fmtAgo, fmtCost, tokenCell } from "./render";
+import { el, fmtAgo, fmtCost, fmtTokens, tokenCell } from "./render";
 
 let SESSION_PAGE = 30;
 let SERVERS: ServerConfig[] = [];
 let panels: ServerPanel[] = [];
-const ACCENTS = ["#58a6ff", "#3fb950", "#a371f7", "#d29922", "#f85149"];
+const ACCENTS = ["#58a6ff", "#3fb950", "#a371f7", "#d29922", "#f85149", "#39c5cf", "#db61a2", "#79c0ff"];
 
 function parseEvent(e: MessageEvent): UpdateEvent | null {
   if (!e.data) return null;
@@ -52,6 +52,7 @@ function bindRow(row: HTMLElement, fn: () => void): void {
 class ServerPanel {
   private overview: ServerOverview | null = null;
   private projects: Project[] = [];
+  private models: ModelUsage[] = [];
   private projectDetails = new Map<string, ProjectDetail>();
   private sessionDetails = new Map<string, SessionDetailResponse>();
   private expandedProjects = new Set<string>();
@@ -102,9 +103,16 @@ class ServerPanel {
 
   private async refresh(): Promise<void> {
     try {
-      const [ov, projects] = await Promise.all([api.overview(this.idx), api.projects(this.idx)]);
+      const [ov, projects, models] = await Promise.all([
+        api.overview(this.idx),
+        api.projects(this.idx),
+        api.models(this.idx).catch((e) =>
+          /\b404\b/.test(e instanceof Error ? e.message : String(e)) ? null : Promise.reject(e),
+        ),
+      ]);
       this.overview = ov;
       this.projects = projects;
+      this.models = models ?? [];
       this.error = null;
     } catch (e) {
       this.error = e instanceof Error ? e.message : String(e);
@@ -189,6 +197,10 @@ class ServerPanel {
       this.root.appendChild(el("div", "error error-bar", `refresh failed: ${this.error}`));
     }
 
+    if (ov) {
+      this.root.appendChild(this.pies());
+    }
+
     this.root.appendChild(el("h3", "sec-head", "Projects"));
     if (!ov) {
       const tbl = el("table", "tbl");
@@ -221,6 +233,21 @@ class ServerPanel {
     for (const p of this.projects) this.renderProject(tbody, p);
     tbl.appendChild(tbody);
     this.root.appendChild(tbl);
+  }
+
+  private pies(): HTMLElement {
+    const grid = el("div", "pies");
+    const model = this.models.map((m) => ({ label: m.model, value: m.tokens.total }));
+    const modelCost = this.models.map((m) => ({ label: m.model, value: m.cost }));
+    const project = this.projects.map((p) => ({ label: p.name, value: p.tokens.total }));
+    const projectCost = this.projects.map((p) => ({ label: p.name, value: p.cost }));
+    grid.append(
+      pieCard("Tokens by model", model, fmtTokens),
+      pieCard("Cost by model", modelCost, fmtCost, "No cost reported"),
+      pieCard("Tokens by project", project, fmtTokens),
+      pieCard("Cost by project", projectCost, fmtCost, "No cost reported"),
+    );
+    return grid;
   }
 
   private renderProject(tbody: HTMLElement, p: Project): void {
@@ -420,6 +447,49 @@ function statCost(value: number | null): HTMLElement {
   const s = el("div", "stat stat-cost");
   s.append(el("span", "num", value === null ? "…" : fmtCost(value)), el("span", "lbl", "cost"));
   return s;
+}
+
+/** Donut with legend. Renders `empty` (default "No data") when nothing has a value. */
+function pieChart(entries: { label: string; value: number }[], fmt: (n: number) => string, empty = "No data"): HTMLElement {
+  const card = el("div", "pie");
+  const total = entries.reduce((s, e) => s + e.value, 0);
+  if (total <= 0) {
+    card.appendChild(el("div", "pie-empty", empty));
+    return card;
+  }
+  const legend = el("ul", "pie-legend");
+  const stops: string[] = [];
+  let acc = 0;
+  entries.forEach((e, i) => {
+    const c = ACCENTS[i % ACCENTS.length];
+    const a = (acc / total) * 360;
+    acc += e.value;
+    stops.push(`${c} ${a}deg ${(acc / total) * 360}deg`);
+    const item = el("li", "pie-item");
+    const swatch = el("span", "pie-swatch");
+    swatch.style.background = c;
+    item.append(
+      swatch,
+      el("span", "pie-label", e.label),
+      el("span", "pie-val", fmt(e.value)),
+    );
+    legend.appendChild(item);
+  });
+  const donut = el("div", "donut");
+  donut.style.background = `conic-gradient(${stops.join(", ")})`;
+  donut.setAttribute("role", "img");
+  donut.setAttribute("aria-label", entries.map((e) => `${e.label}: ${fmt(e.value)}`).join(", "));
+  const hole = el("div", "donut-hole");
+  hole.appendChild(el("span", "", fmt(total)));
+  donut.appendChild(hole);
+  card.append(donut, legend);
+  return card;
+}
+
+function pieCard(title: string, entries: { label: string; value: number }[], fmt: (n: number) => string, empty?: string): HTMLElement {
+  const card = el("div", "pie-card");
+  card.append(el("h4", "pie-title", title), pieChart(entries, fmt, empty));
+  return card;
 }
 
 const app = document.getElementById("app")!;

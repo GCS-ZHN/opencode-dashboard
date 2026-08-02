@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 import { loadDashboardConfig } from "./config";
 
 // Front-end server (dev): browser only talks to this dev server. Requests to
@@ -6,18 +6,18 @@ import { loadDashboardConfig } from "./config";
 // the resolved server list + ui options from dashboard.yaml.
 const cfg = loadDashboardConfig();
 
-// Regex keys avoid prefix-shadowing: /api/s/1 must not swallow /api/s/10
-// (vite matches string keys via startsWith in insertion order).
-const proxy = Object.fromEntries(
-  cfg.servers.map((s, i) => [
-    new RegExp(`^/api/s/${i}(?=/|$)`),
-    {
-      target: s.url,
-      changeOrigin: true,
-      rewrite: (path: string) => path.replace(/^\/api\/s\/\d+/, ""),
-    },
-  ]),
-);
+// Regex-like keys (string, "^" prefix) avoid prefix-shadowing: /api/s/1 must
+// not swallow /api/s/10 (vite matches string keys via startsWith in insertion
+// order). Built with string keys, not Object.fromEntries — that would coerce
+// RegExp instances into "/^.../" strings that vite can't recognize as regexes.
+const proxy: Record<string, ProxyOptions> = {};
+cfg.servers.forEach((s, i) => {
+  proxy[`^/api/s/${i}(?=/|$)`] = {
+    target: s.url,
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/api\/s\/\d+/, ""),
+  };
+});
 
 function apiConfigPlugin(): Plugin {
   return {
