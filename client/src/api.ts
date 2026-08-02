@@ -10,6 +10,7 @@ export interface Tokens {
 export interface ServerOverview {
   host: string;
   opencodeVersion: string;
+  dashboardVersion: string;
   projectCount: number;
   sessionCount: number;
   mainSessionCount: number;
@@ -77,6 +78,7 @@ export interface ServerConfig {
 }
 
 export interface DashboardConfigResponse {
+  version?: string;
   servers: ServerConfig[];
   ui?: { sessionPage?: number };
 }

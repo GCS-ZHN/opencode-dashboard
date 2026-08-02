@@ -167,7 +167,7 @@ class ServerPanel {
     const head = el("header", "srv-head");
     head.append(
       el("h2", "srv-host", ov ? ov.host : this.base),
-      el("span", "srv-ver", ov ? `opencode ${ov.opencodeVersion}` : ""),
+      el("span", "srv-ver", ov ? `dashboard v${ov.dashboardVersion ?? "?"} · opencode ${ov.opencodeVersion}` : ""),
       el("span", "srv-url", this.base),
     );
     const live = el("span", "live");
@@ -584,6 +584,8 @@ async function boot(): Promise<void> {
     const cfg = await api.config();
     servers = cfg.servers;
     SESSION_PAGE = cfg.ui?.sessionPage ?? SESSION_PAGE;
+    const ver = document.getElementById("app-ver");
+    if (ver && cfg.version) ver.textContent = `v${cfg.version}`;
   } catch (e) {
     configError = e instanceof Error ? e.message : String(e);
   }

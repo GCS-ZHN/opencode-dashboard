@@ -29,6 +29,7 @@ Whole-host aggregate.
 {
   "host": "my-machine",
   "opencodeVersion": "1.18.10",
+  "dashboardVersion": "0.4.1",
   "projectCount": 8,
   "sessionCount": 191,
   "mainSessionCount": 157,
@@ -37,7 +38,7 @@ Whole-host aggregate.
   "updatedAt": 1785571208048
 }
 ```
-`updatedAt` = max `time_updated` across `session`/`message` (poll signal for the client).
+`updatedAt` = max `time_updated` across `session`/`message` (poll signal for the client). `dashboardVersion` = the opencode-dashboard-server release running the backend (`importlib.metadata`, falls back to `"unknown"` when uninstalled).
 `sessionCount` = all sessions; `mainSessionCount` = main (root) sessions only — sessions whose `parent_id` is NULL or points at a session not in the DB (i.e. the count of tree roots). Subagent/fork sessions are excluded from `mainSessionCount`.
 
 ### `GET /projects`

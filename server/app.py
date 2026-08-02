@@ -4,6 +4,7 @@ Run:  uv run uvicorn app:app --reload
 """
 
 import asyncio
+import importlib.metadata
 import json
 import logging
 import os
@@ -40,6 +41,13 @@ def opencode_version(executable: str = "opencode") -> str:
         ).stdout.strip()
     except (OSError, subprocess.CalledProcessError):
         return "unknown"  # e.g. CI without the opencode CLI; don't fail the request
+
+
+def dashboard_version() -> str:
+    try:
+        return importlib.metadata.version("opencode-dashboard-server")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"  # e.g. pytest from a plain checkout; don't fail the request
 
 
 def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=None) -> FastAPI:
@@ -81,6 +89,7 @@ def create_app(runner=None, cors_origins=None, poll_seconds=None, opencode_bin=N
             data = aggregate.overview(runner)
             data["host"] = socket.gethostname()
             data["opencodeVersion"] = opencode_version(bin)
+            data["dashboardVersion"] = dashboard_version()
             return data
 
         return handle(run)
