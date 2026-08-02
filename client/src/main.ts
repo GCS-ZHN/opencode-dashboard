@@ -175,7 +175,7 @@ class ServerPanel {
     const upd = el("span", "srv-upd");
     this.updRef = upd;
     this.touch();
-    head.append(live, upd);
+    head.append(live, mcpLink(), upd);
     this.root.appendChild(head);
 
     const stats = el("div", "stats");
@@ -430,6 +430,47 @@ function stat(label: string, value: string): HTMLElement {
   const s = el("div", "stat");
   s.append(el("span", "num", value), el("span", "lbl", label));
   return s;
+}
+
+/** Copy the MCP endpoint URL (current origin + /mcp) to the clipboard. */
+async function copyMcpUrl(link: HTMLAnchorElement): Promise<void> {
+  const text = `${location.origin}/mcp`;
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      throw new Error("clipboard unavailable");
+    }
+  } catch {
+    // Fallback: hidden textarea + execCommand (http / older browsers).
+    const ta = el("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    ta.remove();
+  }
+  const wasCopied = link.classList.contains("copied");
+  const label = wasCopied ? "mcp" : link.textContent;
+  link.textContent = "copied";
+  link.classList.add("copied");
+  setTimeout(() => {
+    link.textContent = label;
+    link.classList.remove("copied");
+  }, 1200);
+}
+
+function mcpLink(): HTMLAnchorElement {
+  const a = el("a", "mcp", "mcp");
+  a.href = `${location.origin}/mcp`;
+  a.title = "Copy MCP endpoint URL";
+  a.addEventListener("click", (e) => {
+    e.preventDefault();
+    void copyMcpUrl(a);
+  });
+  return a;
 }
 
 /** "3 / 6" = main sessions (roots) / total sessions (incl. subagents). */

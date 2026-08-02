@@ -11,6 +11,7 @@ import * as readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
 import { loadDashboardConfig, xdgConfigPath, type DashboardConfig } from "./config";
+import { createMcpHandler } from "./mcp";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST = join(HERE, "..", "dist");
@@ -128,8 +129,16 @@ function serve(argv: string[]): void {
       return usage(`unknown option: ${flag}`);
     }
   }
+  const mcpHandler = createMcpHandler(cfg);
   createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+
+    // /mcp, /mcp/, and any /mcp/<sub> all reach the MCP handler (matches vite's
+    // connect use("/mcp", ...) prefix semantics so dev and prod stay aligned).
+    if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
+      void mcpHandler(req, res);
+      return;
+    }
 
     if (url.pathname === "/api/config") {
       res.writeHead(200, { "content-type": "application/json" });
