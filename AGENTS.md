@@ -42,6 +42,17 @@ opencode db "<SQL>" --format json   # or --format tsv for big pulls
 - SPA shows the endpoint URL + copy in the app header (`#mcp-box`), built from `location.origin` — **never a hardcoded host/port**.
 - Vite dev parity: `vite.config.ts` mounts `/mcp` via connect middleware, but **the dev-server MCP handshake is unreliable with opencode's client** (seen: `SSE error: Unable to connect`). For real opencode integration testing, run the **prod CLI serve** (`node dist-cli/cli.mjs serve`) — that's the supported path.
 
+### MCP server auth (HTTP basic auth)
+
+`/mcp` is protected by the same basic auth as the rest of the front-end server (when `auth.username`/`auth.password` are set). A 401 + `WWW-Authenticate: Basic` on `/mcp` is correct. opencode MCP clients must send the credentials as a header — **the URL-userinfo form does NOT work**: opencode reports "needs authentication" for `http://user:password@host:port/mcp` and never sends URL userinfo as basic auth. Use the config `headers` field instead:
+```jsonc
+// .opencode/config.jsonc
+{ "mcp": { "opencode-dashboard": { "type": "remote", "url": "http://127.0.0.1:5180/mcp",
+    "headers": { "Authorization": "Basic <base64(user:pass)>" } } } }
+```
+- Compute `<base64(user:pass)>` with e.g. `printf 'user:pass' | base64`.
+- In the browser, basic-auth credentials are cached per-realm, so after the single initial prompt the SPA's same-origin fetches AND EventSource carry them automatically — no cookie/bearer logic needed in the SPA (there is none).
+
 ### Verifying the MCP server with `opencode run` (manual smoke test)
 
 1. Start the front-end server in prod mode with the backend configured: `cd client && bun run build && node dist-cli/cli.mjs serve --port 5180` (or `DASHBOARD_CONFIG=<yaml>` for a custom backend set).
@@ -63,7 +74,7 @@ opencode db "<SQL>" --format json   # or --format tsv for big pulls
 
 Installed packages are configured via interactive `configure`, writing to the **shared XDG dir** `~/.config/opencode-dashboard/` — front-end `config.yaml`, back-end `server.yaml`. There is deliberately **no in-package config file**; do not edit files inside `node_modules`/venv to configure.
 
-- Front-end `opencode-dashboard`: `configure` (interactive wizard) + `serve [--port] [--host]`. Config precedence: `DASHBOARD_CONFIG` env > repo `client/dashboard.yaml` (dev only, not shipped) > XDG `config.yaml` > defaults (port 5173, host 0.0.0.0, sessionPage 30).
+- Front-end `opencode-dashboard`: `configure` (interactive wizard) + `serve [--port] [--host]`. Config precedence: `DASHBOARD_CONFIG` env > repo `client/dashboard.yaml` (dev only, not shipped) > XDG `config.yaml` > defaults (port 5173, host 0.0.0.0, sessionPage 30). Optional auth via `auth.username`/`auth.password` (env: `DASHBOARD_AUTH_USERNAME`, `DASHBOARD_AUTH_PASSWORD`; basic enabled only when both set). Auth is enforced in `cli.ts` serve + Vite dev middleware (`client/auth.ts`, constant-time compare). Policy: basic auth guards **all** routes — SPA static files, `/api/config`, `/api/s/{i}` proxy, and `/mcp`. The SPA has no auth-specific code: the browser caches credentials per-realm, so fetches and EventSource carry them automatically.
 - Back-end `opencode-dashboard-server`: `configure` + `serve [--port] [--host] [--config PATH]`. Precedence: `--config` > XDG `server.yaml` > env > defaults. Env switches: `DASHBOARD_CORS_ORIGINS` (comma-separated, default = loopback whitelist), `DASHBOARD_POLL_SECONDS` (default 5), `OPENCODE_BIN`, `PORT`, `HOST`.
 - `configure` must work from a **piped stdin** (EOF → use default), not just interactive TTY.
 

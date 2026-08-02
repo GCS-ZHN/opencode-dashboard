@@ -9,6 +9,13 @@ host: 0.0.0.0
 # Front-end server port (env PORT wins; default 5173)
 port: 5173
 
+# Optional HTTP Basic auth protecting the SPA, /api/* and /mcp. Disabled when
+# either field is empty. Env overrides: DASHBOARD_AUTH_USERNAME, DASHBOARD_AUTH_PASSWORD.
+# MCP clients pass credentials via the config `headers` field, see README "MCP server auth".
+# auth:
+#   username: admin
+#   password: change-me
+
 # Aggregation backends to proxy as /api/s/{index}/*
 servers:
   - name: main
