@@ -129,31 +129,6 @@ Dev uses the repo's `client/dashboard.yaml`; the published npm package never shi
 CLI reads the XDG file written by `configure`. `bun mock-server.ts` serves canned `API.md` JSON for
 frontend-only work.
 
-## Publishing
-
-Both packages are published from this repo by GitHub Actions when you push a version tag:
-
-- **npm** — `opencode-dashboard-client` (built `dist/` + `dist-cli/` CLI bundle, `bin: opencode-dashboard`), published from `client/`.
-- **PyPI** — `opencode-dashboard-server` (wheel containing the `app` / `aggregate` / `db` / `cli` modules, console script `opencode-dashboard-server`), built in `server/`.
-
-### One-time secrets
-
-The publish jobs read two repository secrets. Set them once with `gh`:
-
-```bash
-gh secret set NPM_TOKEN       # npm access token (Automation, publish scope)
-gh secret set PYPI_API_TOKEN  # PyPI API token (project-scoped)
-```
-
-### Release a new version
-
-1. Bump the version in **both** `client/package.json` and `server/pyproject.toml` — they must match the tag.
-2. Push a tag:
-   ```bash
-   git tag vX.Y.Z && git push origin vX.Y.Z
-   ```
-3. The `Publish` workflow (`publish.yml`) builds and publishes both packages. `CI` (`ci.yml`) runs the server tests + ruff and the client typecheck + build on every push and PR.
-
 ## Development intent
 
 Two deliberate design decisions:
