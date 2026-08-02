@@ -52,6 +52,7 @@ Notes:
 - **Multi-server tab view** — an Overall tab with a two-column grid plus one tab per configured backend.
 - **Aggregation pies** — four interactive donut charts per server (tokens/cost × model/project); hover a slice to see its value and share.
 - **Excel export** — one click downloads the current view as `.xlsx` (single-server tab → one workbook; Overall tab → one sheet per server), generated entirely in the browser.
+- **HTTP Basic Auth** — optional protection on the front-end server: the browser-native basic auth prompt guards the SPA, the `/api/*` proxy, and `/mcp`; no front-end code involved (the browser caches credentials per-realm, so fetches and SSE carry them automatically after one prompt). Configure via `opencode-dashboard configure` or the `DASHBOARD_AUTH_USERNAME` / `DASHBOARD_AUTH_PASSWORD` env vars. Off by default.
 - **MCP server** — the front-end server also speaks Model Context Protocol at `/mcp` (copy the endpoint URL from the header), exposing the same overview/project/session queries as read-only tools for agent clients.
 
 ## MCP tools
@@ -67,6 +68,20 @@ The front-end server exposes a read-only **MCP server** at `/mcp` (and `/mcp/`) 
 | `session_detail` | `server`, `sessionId` | One session plus its per-model token/cost breakdown |
 
 MCP clients go through the front-end server exactly like the browser does — they never talk to real backends directly. The tools are read-only.
+
+### MCP server auth
+
+When basic auth is enabled (`configure` or `DASHBOARD_AUTH_USERNAME` / `DASHBOARD_AUTH_PASSWORD`), the `/mcp` endpoint is protected like everything else, and MCP clients must send the credentials as a header. **The URL-userinfo form does NOT work with opencode** — `http://<user>:<password>@host:port/mcp` makes opencode report "needs authentication"; it never sends URL userinfo as basic auth. Use the config `headers` field:
+
+```jsonc
+// .opencode/config.jsonc
+{ "mcp": { "opencode-dashboard": { "type": "remote", "url": "http://<host>:<port>/mcp",
+    "headers": { "Authorization": "Basic <base64(user:pass)>" } } } }
+```
+
+Compute `<base64(user:pass)>` with e.g. `printf 'user:pass' | base64`.
+
+In the browser, basic-auth credentials are cached per-realm, so after the single initial prompt the SPA's same-origin fetches and the SSE stream carry them automatically — no extra front-end code. Basic auth (when configured) gates every route: SPA, `/api/config`, `/api/s/{i}` proxy, and `/mcp` (401 + `WWW-Authenticate: Basic`).
 
 ## Install
 
@@ -97,7 +112,7 @@ Both packages install as **CLIs** — configure them interactively, no editing p
 
 - **Front end** — `npm install -g opencode-dashboard-client` (or `npx opencode-dashboard ...`):
   ```bash
-  opencode-dashboard configure   # interactive: add backends, port, host, ui → XDG config
+  opencode-dashboard configure   # interactive: add backends, port, host, ui, basic auth → XDG config
   opencode-dashboard serve       # start the front-end server (default http://localhost:5173/)
   ```
 - **Backend** — `uv tool install opencode-dashboard-server`, then on each opencode host:
@@ -166,7 +181,7 @@ Endpoints: `GET /health`, `GET /overview`, `GET /models`, `GET /projects`, `GET 
 
 - [ ] **Show version in the UI** — display the dashboard's own version (front-end + backend) somewhere on the page so users can tell which release they're running.
 - [ ] **Loading animations** — replace the current "stuck" feel when content loads (initial page load, expanding/collapsing sessions, switching tabs) with a proper loading animation.
-- [ ] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
+- [x] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
 - [ ] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
 - [ ] **Time-range filtering** — restrict the drill-down to a date window (e.g. today / last 7 days / custom).
 

@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin, type ProxyOptions } from "vite";
+import { defineConfig, type Connect, type Plugin, type ProxyOptions } from "vite";
+import { basicAuthChallenge, checkBasicAuth, type AuthConfig } from "./auth";
 import { loadDashboardConfig } from "./config";
 import { createMcpHandler } from "./mcp";
 
@@ -20,11 +21,22 @@ cfg.servers.forEach((s, i) => {
   };
 });
 
+function basicAuthMiddleware(auth?: AuthConfig): Connect.NextHandleFunction {
+  return (req, res, next) => {
+    if (!auth) return next();
+    // Same policy as cli.ts serve: basic auth guards every route, /mcp included.
+    if (checkBasicAuth(req, auth)) return next();
+    basicAuthChallenge(res);
+  };
+}
+
 function apiConfigPlugin(): Plugin {
   const mcpHandler = createMcpHandler(cfg);
   return {
     name: "api-config",
     configureServer(server) {
+      // Mounted first so it guards /api/config, /mcp, and every proxied route.
+      server.middlewares.use(basicAuthMiddleware(cfg.auth));
       server.middlewares.use("/api/config", (_req, res) => {
         res.setHeader("content-type", "application/json");
         res.end(JSON.stringify({ servers: cfg.servers, ui: cfg.ui }));

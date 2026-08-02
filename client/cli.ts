@@ -3,13 +3,14 @@
 //   serve:     front-end server (static dist/ + /api/config + /api/s/{i}/* proxy)
 //   configure: interactive wizard that writes the XDG config file.
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import * as readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
+import { basicAuthChallenge, checkBasicAuth } from "./auth";
 import { loadDashboardConfig, xdgConfigPath, type DashboardConfig } from "./config";
 import { createMcpHandler } from "./mcp";
 
@@ -132,10 +133,18 @@ function serve(argv: string[]): void {
   const mcpHandler = createMcpHandler(cfg);
   createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://localhost");
+    const isMcp = url.pathname === "/mcp" || url.pathname.startsWith("/mcp/");
+    // Auth gate: basic auth guards every route (SPA, /api/config, /api/s/{i}
+    // proxy, and /mcp). The browser caches credentials per-realm, so after the
+    // first prompt same-origin fetches and EventSource carry them automatically.
+    if (cfg.auth && !checkBasicAuth(req, cfg.auth)) {
+      basicAuthChallenge(res);
+      return;
+    }
 
     // /mcp, /mcp/, and any /mcp/<sub> all reach the MCP handler (matches vite's
     // connect use("/mcp", ...) prefix semantics so dev and prod stay aligned).
-    if (url.pathname === "/mcp" || url.pathname.startsWith("/mcp/")) {
+    if (isMcp) {
       void mcpHandler(req, res);
       return;
     }
@@ -185,6 +194,9 @@ async function configure(): Promise<void> {
     console.log(
       `  port: ${existing.port ?? 5173}, host: ${existing.host ?? "0.0.0.0"}, ui.sessionPage: ${existing.ui?.sessionPage ?? 30}`,
     );
+    console.log(
+      `  auth: ${existing?.auth?.username && existing?.auth?.password ? `basic (user: ${existing.auth.username})` : "basic disabled"}`,
+    );
   }
 
   const servers: DashboardConfig["servers"] = existing?.servers ?? [];
@@ -193,6 +205,20 @@ async function configure(): Promise<void> {
   const ask = async (q: string): Promise<string> => {
     process.stdout.write(q);
     const { value } = await next.next();
+    return value ?? "";
+  };
+  // Password prompt without echo on a TTY; falls back to ask when piped
+  // (automation) since hidden input is impossible there.
+  const askHidden = async (q: string): Promise<string> => {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) return ask(q);
+    const rlInternal = rl as unknown as { _writeToOutput: (s: string) => void };
+    if (typeof rlInternal._writeToOutput !== "function") return ask(q);
+    const orig = rlInternal._writeToOutput.bind(rlInternal);
+    rlInternal._writeToOutput = () => {};
+    process.stdout.write(q);
+    const { value } = await next.next();
+    rlInternal._writeToOutput = orig;
+    process.stdout.write("\n");
     return value ?? "";
   };
 
@@ -212,10 +238,33 @@ async function configure(): Promise<void> {
     existing?.ui?.sessionPage ?? 30,
     "sessionPage",
   );
+  const curUser = existing?.auth?.username ?? "";
+  const curPass = existing?.auth?.password ?? "";
+  const authEnabled = Boolean(curUser && curPass);
+  const rawUser = (await ask(`HTTP Basic auth username [${curUser}]: `)).trim();
+  let username: string;
+  let password: string;
+  let disableAuth = false;
+  if (rawUser) {
+    username = rawUser;
+    password = (await askHidden(`HTTP Basic auth password [${curPass ? "••••••" : ""}]: `)).trim() || curPass;
+  } else if (authEnabled && /^y(es)?$/i.test((await ask("disable auth? [y/N] ")).trim())) {
+    username = "";
+    password = "";
+    disableAuth = true;
+  } else {
+    username = curUser;
+    password = curPass;
+  }
+  const auth = username && password ? { username, password } : undefined;
   rl.close();
 
+  const out: Record<string, unknown> = { host, port, servers, ui: { sessionPage } };
+  if (auth) out.auth = auth;
+  else if (disableAuth) out.auth = { username: "", password: "" };
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, YAML.stringify({ host, port, servers, ui: { sessionPage } }));
+  writeFileSync(path, YAML.stringify(out), { mode: 0o600 });
+  chmodSync(path, 0o600);
   console.log(`wrote ${path}`);
 }
 

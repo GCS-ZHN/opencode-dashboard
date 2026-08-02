@@ -3,6 +3,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
+import type { AuthConfig } from "./auth";
 
 export interface ServerConfig {
   name: string;
@@ -14,6 +15,7 @@ export interface DashboardConfig {
   port?: number;
   servers: ServerConfig[];
   ui?: { sessionPage?: number };
+  auth?: AuthConfig;
 }
 
 // Works under bun (import.meta.dir) and vite's config loader (import.meta.url).
@@ -54,10 +56,22 @@ export function loadDashboardConfig(path: string = resolveConfigPath()): Dashboa
     throw new Error(`invalid port in ${path}: ${String(doc.port)}`);
   }
   const sessionPage = Number(doc.ui?.sessionPage ?? 30);
+  // Basic auth requires both username and password; env wins over the file.
+  // Auth is enabled only when both are set. Empty env values behave as unset.
+  const username = process.env.DASHBOARD_AUTH_USERNAME || doc.auth?.username;
+  const password = process.env.DASHBOARD_AUTH_PASSWORD || doc.auth?.password;
+  if (username !== undefined && typeof username !== "string") {
+    throw new Error(`invalid auth.username in ${path}: ${String(username)}`);
+  }
+  if (password !== undefined && typeof password !== "string") {
+    throw new Error(`invalid auth.password in ${path}: ${String(password)}`);
+  }
+  const auth = username && password ? { username, password } : undefined;
   return {
     host: process.env.HOST ?? doc.host ?? "0.0.0.0",
     port,
     servers: doc.servers ?? [],
     ui: { sessionPage: Number.isInteger(sessionPage) && sessionPage > 0 ? sessionPage : 30 },
+    auth,
   };
 }
