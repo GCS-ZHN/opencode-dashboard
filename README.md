@@ -52,6 +52,20 @@ Notes:
 - **Excel export** — one click downloads the current view as `.xlsx` (single-server tab → one workbook; Overall tab → one sheet per server), generated entirely in the browser.
 - **MCP server** — the front-end server also speaks Model Context Protocol at `/mcp` (copy the endpoint URL from the header), exposing the same overview/project/session queries as read-only tools for agent clients.
 
+## MCP tools
+
+The front-end server exposes a read-only **MCP server** at `/mcp` (and `/mcp/`) on the same process as the dashboard. Point an MCP client (e.g. opencode) at it — `opencode mcp add opencode-dashboard --url http://<host>:<port>/mcp` — and the following tools become available. Every tool takes a `server` index (0-based position in the front-end's configured backend list; use `list_servers` to see them) and returns the same JSON the HTTP API serves.
+
+| Tool | Inputs | Returns |
+|------|--------|---------|
+| `list_servers` | — | Configured backend name + URL list |
+| `overview` | `server` | Host-wide aggregate: project/session counts, tokens, cost |
+| `projects` | `server` | Per-project rollups (tokens + cost) |
+| `project_detail` | `server`, `projectId` | One project plus its sessions |
+| `session_detail` | `server`, `sessionId` | One session plus its per-model token/cost breakdown |
+
+MCP clients go through the front-end server exactly like the browser does — they never talk to real backends directly. The tools are read-only.
+
 ## Install
 
 Prerequisites:
