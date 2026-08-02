@@ -58,6 +58,14 @@ export function tokenBar(tokens: Tokens): HTMLDivElement {
   return bar;
 }
 
+/** Shared loading indicator: CSS spinner, optionally with a caption. */
+export function spinner(text?: string): HTMLDivElement {
+  const wrap = el("div", "loading");
+  wrap.appendChild(el("div", "spinner"));
+  if (text) wrap.appendChild(el("span", "muted", text));
+  return wrap;
+}
+
 export function tokenCell(tokens: Tokens, hero = false): HTMLDivElement {
   const wrap = el("div", "tcell" + (hero ? " hero" : ""));
   const barWrap = el("div", "bar-wrap");
