@@ -168,6 +168,6 @@ Endpoints: `GET /health`, `GET /overview`, `GET /models`, `GET /projects`, `GET 
 - [ ] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
 - [ ] **Time-range filtering** — restrict the drill-down to a date window (e.g. today / last 7 days / custom).
 
-## License / author
+## License
 
-Placeholder — add your license and author information here.
+MIT — see [LICENSE.md](LICENSE.md).
