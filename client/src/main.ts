@@ -176,7 +176,7 @@ class ServerPanel {
     const upd = el("span", "srv-upd");
     this.updRef = upd;
     this.touch();
-    head.append(live, mcpLink(), upd);
+    head.append(live, upd);
     this.root.appendChild(head);
 
     const stats = el("div", "stats");
@@ -434,7 +434,7 @@ function stat(label: string, value: string): HTMLElement {
 }
 
 /** Copy the MCP endpoint URL (current origin + /mcp) to the clipboard. */
-async function copyMcpUrl(link: HTMLAnchorElement): Promise<void> {
+async function copyMcpUrl(link: HTMLElement): Promise<void> {
   const text = `${location.origin}/mcp`;
   try {
     if (navigator.clipboard && window.isSecureContext) {
@@ -463,15 +463,16 @@ async function copyMcpUrl(link: HTMLAnchorElement): Promise<void> {
   }, 1200);
 }
 
-function mcpLink(): HTMLAnchorElement {
-  const a = el("a", "mcp", "mcp");
+/** Wire the global MCP link in the app header (one per dashboard, not per server). */
+function bindMcpLink(): void {
+  const a = document.getElementById("mcp-link") as HTMLAnchorElement | null;
+  if (!a) return;
   a.href = `${location.origin}/mcp`;
   a.title = "Copy MCP endpoint URL";
   a.addEventListener("click", (e) => {
     e.preventDefault();
     void copyMcpUrl(a);
   });
-  return a;
 }
 
 /** "3 / 6" = main sessions (roots) / total sessions (incl. subagents). */
@@ -491,7 +492,11 @@ function statCost(value: number | null): HTMLElement {
   return s;
 }
 
-/** Donut with legend. Renders `empty` (default "No data") when nothing has a value. */
+/**
+ * Interactive SVG donut. Hovering a slice highlights it and shows that
+ * slice's label + value + share in the readout below; no static legend, so
+ * the chart stays the focus. Renders `empty` when nothing has a value.
+ */
 function pieChart(entries: { label: string; value: number }[], fmt: (n: number) => string, empty = "No data"): HTMLElement {
   const card = el("div", "pie");
   const total = entries.reduce((s, e) => s + e.value, 0);
@@ -499,32 +504,66 @@ function pieChart(entries: { label: string; value: number }[], fmt: (n: number) 
     card.appendChild(el("div", "pie-empty", empty));
     return card;
   }
-  const legend = el("ul", "pie-legend");
-  const stops: string[] = [];
+
+  const SIZE = 120;
+  const R = 54;
+  const CX = SIZE / 2;
+  const CY = SIZE / 2;
+  const polar = (angleDeg: number, radius: number): [number, number] => {
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    return [CX + radius * Math.cos(rad), CY + radius * Math.sin(rad)];
+  };
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
+  svg.setAttribute("role", "img");
+  svg.setAttribute("width", String(SIZE));
+  svg.setAttribute("height", String(SIZE));
+  svg.classList.add("donut");
+  const aria = entries.map((e) => `${e.label}: ${fmt(e.value)}`).join(", ");
+  svg.setAttribute("aria-label", aria);
+
   let acc = 0;
   entries.forEach((e, i) => {
-    const c = ACCENTS[i % ACCENTS.length];
-    const a = (acc / total) * 360;
+    const a0 = (acc / total) * 360;
     acc += e.value;
-    stops.push(`${c} ${a}deg ${(acc / total) * 360}deg`);
-    const item = el("li", "pie-item");
-    const swatch = el("span", "pie-swatch");
-    swatch.style.background = c;
-    item.append(
-      swatch,
-      el("span", "pie-label", e.label),
-      el("span", "pie-val", fmt(e.value)),
-    );
-    legend.appendChild(item);
+    const a1 = (acc / total) * 360;
+    const [x0, y0] = polar(a0, R);
+    const [x1, y1] = polar(a1, R);
+    const large = a1 - a0 > 180 ? 1 : 0;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", `M ${CX} ${CY} L ${x0} ${y0} A ${R} ${R} 0 ${large} 1 ${x1} ${y1} Z`);
+    path.setAttribute("fill", ACCENTS[i % ACCENTS.length]);
+    path.setAttribute("stroke", "var(--inset)");
+    path.setAttribute("stroke-width", "1");
+    path.dataset.label = e.label;
+    path.dataset.value = fmt(e.value);
+    const pct = ((e.value / total) * 100).toFixed(1).replace(/\.0$/, "");
+    path.dataset.pct = pct;
+    path.addEventListener("mouseenter", () => showSlice(path));
+    svg.appendChild(path);
   });
-  const donut = el("div", "donut");
-  donut.style.background = `conic-gradient(${stops.join(", ")})`;
-  donut.setAttribute("role", "img");
-  donut.setAttribute("aria-label", entries.map((e) => `${e.label}: ${fmt(e.value)}`).join(", "));
-  const hole = el("div", "donut-hole");
-  hole.appendChild(el("span", "", fmt(total)));
-  donut.appendChild(hole);
-  card.append(donut, legend);
+
+  const readout = el("div", "pie-readout");
+  const setReadout = (text: string, muted: boolean) => {
+    readout.textContent = text;
+    readout.classList.toggle("muted", muted);
+  };
+  setReadout(`total ${fmt(total)}`, true);
+
+  function showSlice(slice: SVGPathElement): void {
+    for (const p of Array.from(svg.querySelectorAll("path"))) {
+      p.classList.toggle("dim", p !== slice);
+      p.classList.toggle("hot", p === slice);
+    }
+    setReadout(`${slice.dataset.label} · ${slice.dataset.value} (${slice.dataset.pct}%)`, false);
+  }
+  svg.addEventListener("mouseleave", () => {
+    for (const p of Array.from(svg.querySelectorAll("path"))) p.classList.remove("dim", "hot");
+    setReadout(`total ${fmt(total)}`, true);
+  });
+
+  card.append(svg, readout);
   return card;
 }
 
@@ -537,6 +576,7 @@ function pieCard(title: string, entries: { label: string; value: number }[], fmt
 const app = document.getElementById("app")!;
 
 async function boot(): Promise<void> {
+  bindMcpLink();
   let servers: ServerConfig[] = [];
   let configError: string | null = null;
   try {

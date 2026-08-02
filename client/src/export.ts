@@ -5,6 +5,7 @@
 // are not exploitable here. If anyone ever adds a read path, revisit the
 // pinned CDN tarball (https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz).
 import { api } from "./api";
+import { el } from "./render";
 import type { Session, Tokens } from "./api";
 
 export interface ExportTarget {
@@ -102,5 +103,19 @@ export async function exportServers(targets: ExportTarget[]): Promise<void> {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
   }
   const stamp = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-  XLSX.writeFile(wb, `opencode-usage-${stamp}.xlsx`);
+  const name = `opencode-usage-${stamp}.xlsx`;
+  // writeFile is the Node path (needs fs); use write()+Blob+a[download] instead
+  // so the filename is explicit and works in every browser (incl. Safari).
+  const bytes = XLSX.write(wb, { bookType: "xlsx", type: "array" }) as ArrayBuffer;
+  const blob = new Blob([bytes], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = el("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }

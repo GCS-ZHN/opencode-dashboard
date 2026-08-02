@@ -41,11 +41,21 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
-.app-head h1 {
+.app-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-title h1 {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.01em;
+}
+
+.app-head .mcp {
+  flex: none;
 }
 
 .legend {
@@ -301,30 +311,42 @@ body {
 
 .pie {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
 }
 
 .donut {
-  position: relative;
-  width: 96px;
-  height: 96px;
   flex: none;
-  border-radius: 50%;
+  display: block;
 }
 
-.donut-hole {
-  position: absolute;
-  inset: 22%;
-  background: var(--inset);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.donut path {
+  transition: opacity 0.15s, filter 0.15s;
+}
+
+.donut path.hot {
+  filter: brightness(1.25);
+}
+
+.donut path.dim {
+  opacity: 0.35;
+}
+
+.pie-readout {
   font-family: var(--mono);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  min-height: 1.2em;
+}
+
+.pie-readout.muted {
+  color: var(--muted);
 }
 
 .pie-empty {
@@ -332,45 +354,6 @@ body {
   font-size: 12px;
   padding: 24px 0;
   text-align: center;
-}
-
-.pie-legend {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  min-width: 0;
-}
-
-.pie-item {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
-.pie-swatch {
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
-  flex: none;
-  align-self: center;
-}
-
-.pie-label {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.pie-val {
-  margin-left: auto;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-variant-numeric: tabular-nums;
 }
 
 .tbl {
