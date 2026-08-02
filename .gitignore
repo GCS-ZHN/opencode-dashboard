@@ -15,3 +15,6 @@ dist-cli/
 
 # Codegraph
 .codegraph/
+
+# Git worktrees for parallel feature branches
+.worktrees/
