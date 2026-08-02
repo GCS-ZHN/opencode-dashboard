@@ -164,7 +164,7 @@ Endpoints: `GET /health`, `GET /overview`, `GET /models`, `GET /projects`, `GET 
 
 ## TODO (roadmap)
 
-- [ ] **Show version in the UI** — display the dashboard's own version (front-end + backend) somewhere on the page so users can tell which release they're running.
+- [x] **Show version in the UI** — the front-end version shows in the header; each backend tab shows its `opencode-dashboard-server` version next to the opencode version.
 - [ ] **Loading animations** — replace the current "stuck" feel when content loads (initial page load, expanding/collapsing sessions, switching tabs) with a proper loading animation.
 - [ ] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
 - [ ] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.

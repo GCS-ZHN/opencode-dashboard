@@ -1,4 +1,5 @@
 import { serve } from "bun";
+import pkg from "./package.json" with { type: "json" };
 import { loadDashboardConfig } from "./config";
 
 const PORT = Number(process.env.PORT ?? 8791);
@@ -148,6 +149,7 @@ const sessionDetails: Record<string, { session: Record<string, unknown>; models:
 const overview: Record<string, unknown> = {
   host: "mock-machine",
   opencodeVersion: "1.18.10",
+  dashboardVersion: "0.4.1",
   projectCount: 2,
   sessionCount: 4,
   tokens: T(138500, 44200, 26100, 99000, 7000),
@@ -217,7 +219,7 @@ serve({
 
     // Front-end server surface: /api/config + /api/s/{i}/* (same route scheme
     // as cli.ts / vite.config.ts), returning canned data for any backend index.
-    if (url.pathname === "/api/config") return json({ servers: cfg.servers, ui: cfg.ui });
+    if (url.pathname === "/api/config") return json({ version: pkg.version, servers: cfg.servers, ui: cfg.ui });
 
     const m = url.pathname.match(/^\/api\/s\/\d+(\/.*)?$/);
     const path = m ? (m[1] ?? "/") : url.pathname;

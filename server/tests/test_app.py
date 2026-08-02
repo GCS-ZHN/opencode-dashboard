@@ -35,7 +35,7 @@ def test_overview_keys():
     c, _ = make_client()
     r = c.get("/overview")
     assert r.status_code == 200
-    assert {"host", "opencodeVersion", "projectCount", "sessionCount",
+    assert {"host", "opencodeVersion", "dashboardVersion", "projectCount", "sessionCount",
             "tokens", "cost", "updatedAt"} <= set(r.json())
 
 

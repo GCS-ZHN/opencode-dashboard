@@ -10,6 +10,7 @@ import { Readable } from "node:stream";
 import * as readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import YAML from "yaml";
+import pkg from "./package.json" with { type: "json" };
 import { loadDashboardConfig, xdgConfigPath, type DashboardConfig } from "./config";
 import { createMcpHandler } from "./mcp";
 
@@ -142,7 +143,7 @@ function serve(argv: string[]): void {
 
     if (url.pathname === "/api/config") {
       res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ servers: cfg.servers, ui: cfg.ui }));
+      res.end(JSON.stringify({ version: pkg.version, servers: cfg.servers, ui: cfg.ui }));
       return;
     }
 
