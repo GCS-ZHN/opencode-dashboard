@@ -11,6 +11,7 @@ import type {
   UpdateEvent,
 } from "./api";
 import { el, fmtAgo, fmtCost, fmtTokens, tokenCell } from "./render";
+import { exportServers, type ExportTarget } from "./export";
 
 let SESSION_PAGE = 30;
 let SERVERS: ServerConfig[] = [];
@@ -582,9 +583,14 @@ async function boot(): Promise<void> {
   };
   addTab("Overall", OVERALL);
   servers.forEach((s, i) => addTab(s.name, String(i)));
+  const exportBtn = el("button", "tab tab-export", "Export Excel");
+  exportBtn.title = "Download the current view as an .xlsx workbook";
+  tabs.appendChild(exportBtn);
   app.before(tabs);
 
+  let current = OVERALL;
   function setView(key: string): void {
+    current = key;
     const overall = key === OVERALL;
     app.classList.toggle("multi", overall && servers.length > 1);
     panels.forEach((p, i) => {
@@ -593,6 +599,26 @@ async function boot(): Promise<void> {
     for (const [k, b] of tabBtns) b.classList.toggle("active", k === key);
   }
   setView(OVERALL);
+
+  exportBtn.addEventListener("click", () => void doExport());
+
+  async function doExport(): Promise<void> {
+    const targets: ExportTarget[] =
+      current === OVERALL
+        ? servers.map((s, i) => ({ idx: i, name: s.name }))
+        : [{ idx: Number(current), name: servers[Number(current)]?.name ?? `server-${current}` }];
+    exportBtn.disabled = true;
+    const label = exportBtn.textContent ?? "";
+    exportBtn.textContent = "Exporting…";
+    try {
+      await exportServers(targets);
+    } catch (e) {
+      alert(`Export failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      exportBtn.disabled = false;
+      exportBtn.textContent = label;
+    }
+  }
 }
 
 void boot();

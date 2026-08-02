@@ -126,6 +126,23 @@ body {
   border-bottom: 2px solid var(--accent);
 }
 
+.tab-export {
+  margin-left: auto;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent);
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.tab-export:hover {
+  background: rgba(88, 166, 255, 0.18);
+}
+
+.tab-export:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .server {
   background: var(--panel);
   border: 1px solid var(--border);
