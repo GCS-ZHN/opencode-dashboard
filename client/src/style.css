@@ -159,6 +159,14 @@ body {
   border-top: 3px solid var(--accent);
   border-radius: 10px;
   padding: 16px 20px 20px;
+  animation: fade-in 160ms ease;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
 }
 
 .srv-head {
@@ -243,7 +251,9 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .live.on {
+  .live.on,
+  .spinner,
+  .server {
     animation: none;
   }
 }
@@ -614,6 +624,37 @@ td.cost {
 
 .more:hover {
   border-color: var(--accent);
+}
+
+.loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-loading {
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
 }
 
 .skeleton-row td {

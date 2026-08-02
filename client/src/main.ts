@@ -10,7 +10,7 @@ import type {
   Tokens,
   UpdateEvent,
 } from "./api";
-import { el, fmtAgo, fmtCost, fmtTokens, tokenCell } from "./render";
+import { el, fmtAgo, fmtCost, fmtTokens, spinner, tokenCell } from "./render";
 import { exportServers, type ExportTarget } from "./export";
 
 let SESSION_PAGE = 30;
@@ -273,7 +273,7 @@ class ServerPanel {
       td.colSpan = 4;
       const detail = this.projectDetails.get(p.id);
       if (!detail) {
-        td.appendChild(el("div", "muted", "Loading…"));
+        td.appendChild(spinner("Loading sessions…"));
       } else {
         const limit = this.sessionLimits.get(p.id) ?? SESSION_PAGE;
         const tree = el("div", "stree");
@@ -295,6 +295,7 @@ class ServerPanel {
       this.render();
     } else {
       this.expandedProjects.add(id);
+      this.render();
       void this.loadProject(id);
     }
   }
@@ -375,7 +376,7 @@ class ServerPanel {
       detail.style.setProperty("--depth", String(depth + 1));
       const det = this.sessionDetails.get(s.id);
       if (!det) {
-        detail.appendChild(el("div", "muted", "Loading…"));
+        detail.appendChild(spinner("Loading model breakdown…"));
       } else if (det.models.length === 0) {
         detail.appendChild(el("div", "muted", "No token usage recorded"));
       } else {
@@ -401,6 +402,7 @@ class ServerPanel {
       this.render();
     } else {
       this.expandedSessions.add(id);
+      this.render();
       void this.loadSession(id);
     }
   }
@@ -578,6 +580,9 @@ const app = document.getElementById("app")!;
 
 async function boot(): Promise<void> {
   bindMcpLink();
+  const bootLoading = spinner("Loading dashboard…");
+  bootLoading.classList.add("page-loading");
+  app.replaceChildren(bootLoading);
   let servers: ServerConfig[] = [];
   let configError: string | null = null;
   try {
@@ -603,6 +608,7 @@ async function boot(): Promise<void> {
   }
 
   if (servers.length > 1) app.classList.add("multi");
+  app.replaceChildren();
   panels = [];
   for (let i = 0; i < servers.length; i++) {
     const panel = new ServerPanel(i);
