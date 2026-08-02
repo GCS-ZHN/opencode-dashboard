@@ -91,7 +91,8 @@ Installed packages are configured via interactive `configure`, writing to the **
 - Tag `v*` → GitHub Actions `publish.yml`: npm (`opencode-dashboard-client`) + PyPI (`opencode-dashboard-server`) + GitHub Release (wheel/sdist/client-dist.zip). Secrets: `NPM_TOKEN`, `PYPI_API_TOKEN` (set via `gh secret set`).
 - `ci.yml` runs on push/PR: server `uv sync && uv run pytest -q && uvx ruff check .`; client `bun install --frozen-lockfile && bun run build`.
 - One-time repo secrets (already set; re-set only if they rotate): `gh secret set NPM_TOKEN` (Automation, publish scope), `gh secret set PYPI_API_TOKEN` (project-scoped).
-- Release flow: bump version in **both** `client/package.json` and `server/pyproject.toml` (must equal the tag); **then `cd server && uv lock`** — `uv.lock` records the project version and a stale lock fails `uv build` in CI. Commit → `git tag vX.Y.Z && git push origin vX.Y.Z` → verify the run (`gh run watch`) and refresh the release notes.
+- Release flow: bump version in **both** `client/package.json` and `server/pyproject.toml` (must equal the tag); **then `cd server && uv lock`** — `uv.lock` records the project version and a stale lock fails `uv build` in CI. Commit → `git tag vX.Y.Z && git push origin vX.Y.Z` → verify the run (`gh run watch`).
+- **Polish the GitHub release after every publish** — the auto-generated tag release has no useful body. Use `gh` to rewrite the release description (`gh release edit vX.Y.Z --notes-file -` or `--notes "..."`) with a readable changelog: feature list, breaking changes, upgrade notes, install/update commands. Do this as a standing habit after every release, not an afterthought.
 - Packages keep registry metadata in code: `package.json` `homepage`/`repository`/`bugs`; `pyproject.toml` `[project.urls]` + `[project.scripts]`.
 
 ## Workflow

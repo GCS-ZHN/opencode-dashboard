@@ -86,45 +86,27 @@ In the browser, basic-auth credentials are cached per-realm, so after the single
 
 ## Install
 
-Prerequisites:
+Both packages install as **CLIs** from the package registries — configure them interactively, no
+building, no editing package files.
 
-- **Python ≥ 3.10** and [uv](https://github.com/astral-sh/uv)
-- **Node ≥ 22** and [bun](https://bun.sh)
-
-Server (`server/`):
-
-```bash
-cd server
-uv sync            # install deps (fastapi, uvicorn + dev: pytest, httpx)
-uv run pytest      # run the test suite
-```
-
-Client (`client/`):
-
-```bash
-cd client
-bun install
-bun run build      # typecheck (tsc) + bundle (vite)
-```
-
-### Install from registries (published packages, CLI)
-
-Both packages install as **CLIs** — configure them interactively, no editing package files.
-
-- **Front end** — `npm install -g opencode-dashboard-client` (or `npx opencode-dashboard ...`):
+- **Front end (npm)** — requires Node ≥ 22:
   ```bash
+  npm install -g opencode-dashboard-client   # or: npx opencode-dashboard ...
   opencode-dashboard configure   # interactive: add backends, port, host, ui, basic auth → XDG config
   opencode-dashboard serve       # start the front-end server (default http://localhost:5173/)
   ```
-- **Backend** — `uv tool install opencode-dashboard-server`, then on each opencode host:
+- **Backend (PyPI, uv)** — requires Python ≥ 3.10 and [uv](https://github.com/astral-sh/uv); install
+  on each opencode host:
   ```bash
+  uv tool install opencode-dashboard-server
   opencode-dashboard-server configure   # interactive: port, host, CORS, poll → XDG config
   opencode-dashboard-server serve       # start the aggregator (default port 8791)
   ```
 
 Runtime configuration lives in the **XDG config dir** (`~/.config/opencode-dashboard/`, front end
 `config.yaml` / back end `server.yaml`, shared directory, separate files), written by the
-`configure` command — never by editing files inside an installed package.
+`configure` command — never by editing files inside an installed package. Building from source is
+covered under [Development](#development-from-source) below.
 
 ## Usage
 
@@ -151,6 +133,9 @@ The SPA fetches the server list + UI options from `GET /api/config` at startup �
 them, so changing config and restarting `serve` is all it takes.
 
 ## Development (from source)
+
+Building from source requires Python ≥ 3.10 + [uv](https://github.com/astral-sh/uv) (server) and
+Node ≥ 22 + [bun](https://bun.sh) (client).
 
 ```bash
 # server
