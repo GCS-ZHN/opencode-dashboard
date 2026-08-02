@@ -48,6 +48,9 @@ Notes:
 - **Main vs. total sessions** — every level distinguishes *main* sessions (tree roots) from *total* (including subagents).
 - **SSE live refresh** — the server polls the DB (~5s) and broadcasts `updated` events; the client refetches only what changed.
 - **Multi-server tab view** — an Overall tab with a two-column grid plus one tab per configured backend.
+- **Aggregation pies** — four interactive donut charts per server (tokens/cost × model/project); hover a slice to see its value and share.
+- **Excel export** — one click downloads the current view as `.xlsx` (single-server tab → one workbook; Overall tab → one sheet per server), generated entirely in the browser.
+- **MCP server** — the front-end server also speaks Model Context Protocol at `/mcp` (copy the endpoint URL from the header), exposing the same overview/project/session queries as read-only tools for agent clients.
 
 ## Install
 
@@ -141,12 +144,10 @@ Two deliberate design decisions:
 
 The server↔client contract lives in [`API.md`](API.md) and both sides implement exactly that: endpoint list, JSON shapes (camelCase, epoch-ms timestamps), ordering rules, and the SSE event format. If you change it, change `API.md` first, then both sides.
 
-Endpoints: `GET /health`, `GET /overview`, `GET /projects`, `GET /projects/{projectId}`, `GET /sessions/{sessionId}`, `GET /stream` (SSE).
+Endpoints: `GET /health`, `GET /overview`, `GET /models`, `GET /projects`, `GET /projects/{projectId}`, `GET /sessions/{sessionId}`, `GET /stream` (SSE).
 
 ## TODO (roadmap)
 
-- [ ] **Excel export** — export the per-granularity rollups (overview / project / session / model) to a `.xlsx` report.
-- [ ] **MCP service** — expose the dashboard's statistics as an MCP server/tool so agents can query token usage programmatically.
 - [ ] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
 - [ ] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
 - [ ] **Time-range filtering** — restrict the drill-down to a date window (e.g. today / last 7 days / custom).
