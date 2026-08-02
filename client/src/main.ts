@@ -66,6 +66,8 @@ class ServerPanel {
   private error: string | null = null;
   /** Bumped on every reload(); stale fetches check this before writing state. */
   private gen = 0;
+  /** True while a full reload is in flight (initial load / range switch); shows the panel spinner. */
+  private loading = false;
   private es: EventSource | null = null;
   private liveRef: HTMLSpanElement | null = null;
   private updRef: HTMLSpanElement | null = null;
@@ -81,6 +83,7 @@ class ServerPanel {
 
   start(): void {
     this.connect();
+    this.render();
     void this.refresh();
   }
 
@@ -127,12 +130,15 @@ class ServerPanel {
       if (g !== this.gen) return;
       this.error = e instanceof Error ? e.message : String(e);
     }
+    this.loading = false;
     this.render();
   }
 
   /** Re-fetch everything for a new range: drop cached drill-down, reload expanded. */
   reload(): Promise<void> {
     ++this.gen;
+    this.loading = true;
+    this.render();
     this.projectDetails.clear();
     this.sessionDetails.clear();
     const tasks: Promise<void>[] = [this.refresh()];
@@ -207,6 +213,15 @@ class ServerPanel {
     head.append(live, upd);
     this.root.appendChild(head);
 
+    // Panel-level loading: initial fetch (no overview yet) or a range switch in
+    // flight — show a big spinner instead of a blank/stale panel.
+    if (this.loading || !ov) {
+      const box = el("div", "panel-loading");
+      box.appendChild(spinner("Loading…"));
+      this.root.appendChild(box);
+      return;
+    }
+
     const stats = el("div", "stats");
     const sStat = stat("sessions", ov ? sessionCountLabel(ov.mainSessionCount, ov.sessionCount) : "…");
     sStat.title = ov ? `${ov.mainSessionCount} main sessions · ${ov.sessionCount} total (incl. subagents)` : "";
@@ -231,21 +246,6 @@ class ServerPanel {
     }
 
     this.root.appendChild(el("h3", "sec-head", "Projects"));
-    if (!ov) {
-      const tbl = el("table", "tbl");
-      const tbody = el("tbody");
-      for (let i = 0; i < 3; i++) {
-        const tr = el("tr", "skeleton-row");
-        const td = el("td");
-        td.colSpan = 4;
-        td.appendChild(el("div", "skeleton"));
-        tr.appendChild(td);
-        tbody.appendChild(tr);
-      }
-      tbl.appendChild(tbody);
-      this.root.appendChild(tbl);
-      return;
-    }
 
     if (this.projects.length === 0) {
       this.root.appendChild(

@@ -30,6 +30,25 @@ front-end port, host, and `ui.sessionPage`. Re-run it any time to preview and ex
 config. You can also hand-edit the file — the SPA fetches the server list + UI options from
 `GET /api/config` at startup, so there is nothing to rebuild after a change.
 
+### Optional HTTP Basic Auth
+
+Protect the whole front-end server — the SPA, `/api/config`, the `/api/s/{i}` proxy, and `/mcp` —
+with standard HTTP Basic Auth:
+
+```yaml
+auth:
+  username: admin
+  password: secret
+```
+
+Set it via the `configure` wizard, by hand-editing the YAML, or with the `DASHBOARD_AUTH_USERNAME` /
+`DASHBOARD_AUTH_PASSWORD` env vars (which override the file). Auth is **off by default** and is only
+enforced when **both** fields are set. The browser prompts once and caches the credentials per-realm,
+so subsequent fetches and the SSE stream carry them automatically — no front-end code involved. MCP
+clients (e.g. opencode) must send the credentials as a header — `headers: { "Authorization": "Basic
+<base64(user:pass)>" }` (`printf 'user:pass' | base64`); the `http://user:password@host:port/mcp` URL
+form does **not** work with opencode. See "MCP server auth" in the main README for details.
+
 ## Run
 
 ```bash
@@ -54,6 +73,8 @@ bun run dev        # Vite dev server (reads repo dashboard.yaml) → :5173
 bun run build      # typecheck (tsc) + bundle (vite + CLI)
 bun run serve      # run the built CLI: node dist-cli/cli.mjs serve
 bun mock-server.ts # serve canned API data for frontend-only work (PORT env, default 8791)
+bun run mock-backend.ts # large slow dataset backend for loading-state/caching work (PORT env, default 8899)
+bun run test:e2e   # Playwright: boots mock-backend + built front-end, runs client/e2e/ specs
 ```
 
 During dev the repo `dashboard.yaml` is used; the published package never ships it — runtime

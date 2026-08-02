@@ -92,6 +92,10 @@ body {
   gap: 6px;
 }
 
+.range-custom[hidden] {
+  display: none;
+}
+
 .range-custom input[type="date"] {
   color-scheme: dark;
 }
@@ -699,6 +703,22 @@ td.cost {
   display: flex;
   justify-content: center;
   padding: 80px 0;
+}
+
+.panel-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 56px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.panel-loading .spinner {
+  width: 28px;
+  height: 28px;
+  border-width: 3px;
 }
 
 .skeleton-row td {

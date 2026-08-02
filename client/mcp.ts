@@ -41,7 +41,8 @@ const TOOLS = [
   },
   {
     name: "overview",
-    description: "Aggregate token usage overview for one backend (host, opencode version, totals).",
+    description:
+      "Aggregate token usage overview for one backend (host, opencode version, totals). cost is in USD, for reference only: it depends on the model price configured in opencode at the time of use; unconfigured prices report 0.",
     inputSchema: {
       type: "object",
       properties: { server: { type: "number", description: "Backend index (see list_servers)" } },
@@ -50,7 +51,8 @@ const TOOLS = [
   },
   {
     name: "projects",
-    description: "Per-project token usage for one backend.",
+    description:
+      "Per-project token usage for one backend. cost is in USD, for reference only: it depends on the model price configured in opencode at the time of use; unconfigured prices report 0.",
     inputSchema: {
       type: "object",
       properties: { server: { type: "number", description: "Backend index (see list_servers)" } },
@@ -59,7 +61,8 @@ const TOOLS = [
   },
   {
     name: "project_detail",
-    description: "One project plus its sessions for one backend.",
+    description:
+      "One project plus its sessions for one backend. cost is in USD, for reference only: it depends on the model price configured in opencode at the time of use; unconfigured prices report 0.",
     inputSchema: {
       type: "object",
       properties: {
@@ -71,7 +74,8 @@ const TOOLS = [
   },
   {
     name: "session_detail",
-    description: "One session including its per-model token breakdown for one backend.",
+    description:
+      "One session including its per-model token breakdown for one backend. cost is in USD, for reference only: it depends on the model price configured in opencode at the time of use; unconfigured prices report 0.",
     inputSchema: {
       type: "object",
       properties: {

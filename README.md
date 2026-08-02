@@ -162,7 +162,10 @@ bun run build                              # typecheck (tsc) + bundle (vite) + C
 
 Dev uses the repo's `client/dashboard.yaml`; the published npm package never ships it — the installed
 CLI reads the XDG file written by `configure`. `bun mock-server.ts` serves canned `API.md` JSON for
-frontend-only work.
+frontend-only work; `bun run mock-backend.ts` (in `client/`) serves a **large, slow** backend dataset
+for exercising loading states, caching and time-range filtering. Front-end PAGE changes are verified
+with Playwright, not just `bun run build`: `cd client && bun run test:e2e` boots the mock backend +
+the built front-end server and runs the `client/e2e/` specs (see `AGENTS.md`).
 
 ## Development intent
 
@@ -185,6 +188,7 @@ Endpoints: `GET /health`, `GET /overview`, `GET /models`, `GET /projects`, `GET 
 - [x] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
 - [x] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
 - [x] **Time-range filtering** — restrict the drill-down to a date window (e.g. today / last 7 days / custom).
+- [ ] **Secure backend↔front-end server communication** — the front-end talks to each configured backend over plain HTTP today. Add per-backend credentials/token auth so a front-end can reach an authenticated backend, and (optionally) TLS. Low priority — backends are typically loopback-only.
 
 ## License
 

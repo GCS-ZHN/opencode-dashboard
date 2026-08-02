@@ -80,8 +80,14 @@ async function proxy(req: IncomingMessage, res: ServerResponse, target: string):
     if (!HOP_BY_HOP.has(k.toLowerCase())) out[k] = v;
   });
   res.writeHead(upstream.status, out);
-  if (upstream.body) Readable.fromWeb(upstream.body).pipe(res);
-  else res.end();
+  if (upstream.body) {
+    const stream = Readable.fromWeb(upstream.body);
+    // Upstream close mid-stream (backend restart, network drop) must not crash
+    // the server: an unhandled 'error' on the piped stream kills the process.
+    stream.on("error", () => res.destroy());
+    res.on("close", () => stream.destroy());
+    stream.pipe(res);
+  } else res.end();
 }
 
 async function serveStatic(res: ServerResponse, pathname: string): Promise<void> {

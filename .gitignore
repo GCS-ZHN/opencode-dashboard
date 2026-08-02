@@ -10,6 +10,10 @@ dist/
 dist-cli/
 *.egg-info/
 
+# Playwright
+test-results/
+playwright-report/
+
 # OS
 .DS_Store
 
