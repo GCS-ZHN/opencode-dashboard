@@ -48,7 +48,7 @@ Notes:
 - **Two-level drill-down** — `/projects/{id}` lists a project's sessions, `/sessions/{id}` gives the per-model breakdown (input/output/reasoning/cache + cost) for a session, including mid-conversation model switches.
 - **Session tree** — sessions are rendered as parent/child trees (subagent & fork sessions attach to their parent). Subagents are **collapsed by default**; a parent's totals **include all descendants**.
 - **Main vs. total sessions** — every level distinguishes *main* sessions (tree roots) from *total* (including subagents).
-- **SSE live refresh** — the server polls the DB (~5s) and broadcasts `updated` events; the client refetches only what changed.
+- **Cached aggregation + SSE live refresh** — the server aggregates once per poll (~5s, `DASHBOARD_POLL_SECONDS`) into an in-memory cache and serves cached values between polls (a failed refresh keeps the last good value); `/stream` broadcasts `updated` events when a poll finds new data, and the client refetches only what changed.
 - **Multi-server tab view** — an Overall tab with a two-column grid plus one tab per configured backend.
 - **Time-range filtering** — restrict every level (overview → projects → sessions → models) to a date window: today / last 7 days / custom dates, applied server-side via `since`/`until` query params.
 - **Aggregation pies** — four interactive donut charts per server (tokens/cost × model/project); hover a slice to see its value and share.
@@ -181,9 +181,10 @@ Endpoints: `GET /health`, `GET /overview`, `GET /models`, `GET /projects`, `GET 
 ## TODO (roadmap)
 
 - [x] **Show version in the UI** — the front-end version shows in the header; each backend tab shows its `opencode-dashboard-server` version next to the opencode version.
-- [ ] **Loading animations** — replace the current "stuck" feel when content loads (initial page load, expanding/collapsing sessions, switching tabs) with a proper loading animation.
+- [x] **Loading animations** — replace the current "stuck" feel when content loads (initial page load, expanding/collapsing sessions, switching tabs) with a proper loading animation.
 - [x] **HTTP Basic Auth** — standard HTTP basic auth on the front-end server (works with any browser, no extra front-end code).
-- [ ] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
+- [x] **Incremental sync / caching** — poll once and serve from cache instead of re-aggregating on every request.
+- [x] **Time-range filtering** — restrict the drill-down to a date window (e.g. today / last 7 days / custom).
 
 ## License
 

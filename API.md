@@ -23,6 +23,7 @@ Shared contract between `server/` (FastAPI aggregator over `opencode db`) and `c
   `total` = input + output + reasoning + cacheRead + cacheWrite.
 - Cost: USD float.
 - Server binds loopback; no auth for MVP (client and server on same host, or trusted network).
+- **Caching (incremental sync).** Aggregating a large opencode DB is expensive, so the server does NOT re-aggregate on every request. Results are computed on first request, then refreshed in the background on a fixed interval (`poll_seconds`, default 5s via `DASHBOARD_POLL_SECONDS`); requests between refreshes serve the cached value. A failed refresh keeps the last good value (stale-serve); the first fill of an endpoint failing returns 500. Response shapes are unchanged — caching is invisible over the wire, except that the data you get may be up to `poll_seconds` old. `/stream` is driven by these refreshes (see below).
 
 ## Endpoints
 
@@ -119,7 +120,7 @@ Session detail + per-model breakdown (per-message aggregation; covers mid-conver
 `messageCount` = assistant messages contributing tokens for that model. `models` ordered by `cost` desc. Empty array if no assistant token-bearing messages.
 
 ### `GET /stream`
-Server-Sent Events. Server polls the DB internally (≈5s) for changes via `time_updated`; on change it broadcasts:
+Server-Sent Events. The server refreshes its cached aggregates on a fixed interval (`poll_seconds`, default 5s). Each refresh that advances the data (`updatedAt`) broadcasts a change event; a refresh that finds nothing new broadcasts nothing. Heartbeat every 3 refreshes (~15s). It emits **on change, not on every poll**:
 ```
 data: {"type":"updated","at":1785571656477,"scope":"overview"}
 
